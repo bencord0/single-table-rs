@@ -1,0 +1,20 @@
+[package]
+name = "single-table-rs"
+version = "0.1.0"
+authors = ["Ben Cordero <bencord0@condi.me>"]
+edition = "2018"
+
+[dependencies]
+chrono = "0.4.11"
+futures = "0.3.5"
+lazy_static = "1.4.0"
+rand = "0.7.3"
+rusoto_core = "0.44.0"
+rusoto_dynamodb = "0.44.0"
+serde = "1.0.111"
+smol = { version = "0.1.11", features = ["tokio02"] }
+uuid = { version = "0.8.1", features = ["v4"] }
+
+# https://github.com/mockersf/serde_dynamodb/pull/138
+# This is version 0.5.0, with a dependency on rusoto 0.44.0
+serde_dynamodb = { git = "https://github.com/mockersf/serde_dynamodb", rev = "c352024c0ae25f32f03494585449aa3c4a0b27b4" }
