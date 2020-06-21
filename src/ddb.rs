@@ -43,7 +43,7 @@ pub fn dynamodb() -> DDB {
     })
 }
 
-#[async_trait(?Send)]
+#[async_trait]
 impl crate::traits::Database for DDB {
 
     fn table_name(&self) -> String {
@@ -122,7 +122,7 @@ impl crate::traits::Database for DDB {
         sk: Option<S>,
     ) -> GetItemResult
     where
-        S: Into<String>,
+        S: Into<String> + Send,
     {
         let mut key = HashMap::new();
         key.insert(
@@ -167,7 +167,7 @@ impl crate::traits::Database for DDB {
 
     async fn query<S>(&self, pk: S, sk: S) -> QueryResult
     where
-        S: Into<String>,
+        S: Into<String> + Send,
     {
         let keys = "pk = :pk AND begins_with(sk, :sk)".to_string();
         let mut values = HashMap::new();
