@@ -1,6 +1,10 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+pub mod ddb;
+pub mod types;
+pub mod traits;
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Model {
     name: String,
@@ -60,188 +64,10 @@ impl SubModel {
     }
 }
 
-pub mod ddb {
-    use rusoto_core::{Region, RusotoError};
-    use std::env;
-
-    #[rustfmt::skip]
-    use rusoto_dynamodb::{
-        DynamoDb,
-        DynamoDbClient,
-        KeySchemaElement,
-        ProvisionedThroughput,
-
-        AttributeDefinition,
-        AttributeValue,
-
-        CreateTableError, CreateTableInput, CreateTableOutput,
-        DeleteTableError, DeleteTableInput, DeleteTableOutput,
-        GetItemError, GetItemInput, GetItemOutput,
-        PutItemError, PutItemInput, PutItemOutput,
-        QueryError, QueryInput, QueryOutput,
-    };
-
-    pub struct DDB(DynamoDbClient, String);
-    pub type HashMap = std::collections::HashMap<String, AttributeValue>;
-
-    pub fn dynamodb() -> DDB {
-        env::set_var("AWS_ACCESS_KEY_ID", "local");
-        env::set_var("AWS_SECRET_ACCESS_KEY", "local");
-
-        let region = Region::Custom {
-            name: "local".to_owned(),
-            endpoint: "http://localhost:1000".to_owned(),
-        };
-
-        DDB(DynamoDbClient::new(region), {
-            let uuid = uuid::Uuid::new_v4();
-            format!("models-rs-{}", uuid.to_hyphenated().to_string())
-        })
-    }
-
-    impl DDB {
-        pub fn table_name(&self) -> String {
-            self.1.clone()
-        }
-
-        pub async fn delete_table(
-            &self,
-        ) -> Result<DeleteTableOutput, RusotoError<DeleteTableError>> {
-            self.0
-                .delete_table(DeleteTableInput {
-                    table_name: self.table_name(),
-                    ..Default::default()
-                })
-                .await
-        }
-
-        pub fn sync_delete_table(&self) {
-            let _ = smol::run(async { self.delete_table().await });
-        }
-
-        pub async fn create_table(
-            &self,
-        ) -> Result<CreateTableOutput, RusotoError<CreateTableError>> {
-            self.0
-                .create_table(CreateTableInput {
-                    table_name: self.table_name(),
-                    key_schema: vec![
-                        KeySchemaElement {
-                            attribute_name: "pk".to_string(),
-                            key_type: "HASH".to_string(),
-                        },
-                        KeySchemaElement {
-                            attribute_name: "sk".to_string(),
-                            key_type: "RANGE".to_string(),
-                        },
-                    ],
-                    attribute_definitions: vec![
-                        AttributeDefinition {
-                            attribute_name: "pk".to_string(),
-                            attribute_type: "S".to_string(),
-                        },
-                        AttributeDefinition {
-                            attribute_name: "sk".to_string(),
-                            attribute_type: "S".to_string(),
-                        },
-                    ],
-                    provisioned_throughput: Some(ProvisionedThroughput {
-                        read_capacity_units: 1,
-                        write_capacity_units: 1,
-                    }),
-                    ..Default::default()
-                })
-                .await
-        }
-
-        pub fn sync_create_table(&self) {
-            let _ = smol::run(async { self.create_table().await });
-        }
-
-        pub async fn get_item<S>(
-            &self,
-            pk: S,
-            sk: Option<S>,
-        ) -> Result<GetItemOutput, RusotoError<GetItemError>>
-        where
-            S: Into<String>,
-        {
-            let mut key = HashMap::new();
-            key.insert(
-                "pk".to_string(),
-                AttributeValue {
-                    s: Some(pk.into()),
-                    ..Default::default()
-                },
-            );
-            if let Some(sk) = sk {
-                key.insert(
-                    "sk".to_string(),
-                    AttributeValue {
-                        s: Some(sk.into()),
-                        ..Default::default()
-                    },
-                );
-            }
-
-            self.0
-                .get_item(GetItemInput {
-                    table_name: self.table_name(),
-                    key,
-                    ..Default::default()
-                })
-                .await
-        }
-
-        pub async fn put_item(
-            &self,
-            item: HashMap,
-        ) -> Result<PutItemOutput, RusotoError<PutItemError>> {
-            self.0
-                .put_item(PutItemInput {
-                    table_name: self.table_name(),
-                    item,
-                    ..Default::default()
-                })
-                .await
-        }
-
-        pub async fn query<S>(&self, pk: S, sk: S) -> Result<QueryOutput, RusotoError<QueryError>>
-        where
-            S: Into<String>,
-        {
-            let keys = "pk = :pk AND begins_with(sk, :sk)".to_string();
-            let mut values = HashMap::new();
-            values.insert(
-                ":pk".to_string(),
-                AttributeValue {
-                    s: Some(pk.into()),
-                    ..Default::default()
-                },
-            );
-            values.insert(
-                ":sk".to_string(),
-                AttributeValue {
-                    s: Some(sk.into()),
-                    ..Default::default()
-                },
-            );
-
-            self.0
-                .query(QueryInput {
-                    table_name: self.table_name(),
-                    key_condition_expression: Some(keys),
-                    expression_attribute_values: Some(values),
-                    ..Default::default()
-                })
-                .await
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use traits::Database;
 
     #[test]
     fn test_get_none() {
@@ -253,7 +79,7 @@ mod tests {
         {
             let item = get_item_output.item;
             assert_eq!(item, None);
-        }
+        } else { assert!(false); }
 
         ddb.sync_delete_table();
     }
@@ -265,9 +91,9 @@ mod tests {
 
         let model = Model::new("foo", 1);
 
-        let hashmap: ddb::HashMap = match serde_dynamodb::to_hashmap(&model) {
+        let hashmap: types::HashMap = match serde_dynamodb::to_hashmap(&model) {
             Ok(hashmap) => hashmap,
-            Err(_) => ddb::HashMap::new(),
+            Err(_) => types::HashMap::new(),
         };
 
         if let Ok(put_item_output) = smol::run(async { ddb.put_item(hashmap).await }) {
@@ -279,7 +105,7 @@ mod tests {
         {
             let item = match get_item_output.item {
                 Some(item) => item,
-                None => ddb::HashMap::new(),
+                None => types::HashMap::new(),
             };
 
             let model: serde_dynamodb::error::Result<Model> = serde_dynamodb::from_hashmap(item);
@@ -288,7 +114,7 @@ mod tests {
             if let Ok(model) = model {
                 println!("{:?}", model);
             }
-        }
+        } else { assert!(false); }
 
         ddb.sync_delete_table();
     }
@@ -341,7 +167,7 @@ mod tests {
                 };
                 submodels.push(sm);
             }
-        }
+        } else { assert!(false); }
 
         println!("{:#?}", submodels);
         assert_eq!(submodels.len(), 2);
