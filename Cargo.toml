@@ -1,5 +1,5 @@
 [package]
-name = "single-table-rs"
+name = "single-table"
 version = "0.1.0"
 authors = ["Ben Cordero <bencord0@condi.me>"]
 edition = "2018"
