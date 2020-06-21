@@ -1,10 +1,6 @@
 use async_mutex::Mutex;
 use async_trait::async_trait;
-use smol_timeout::TimeoutExt;
-use std::{
-    collections::BTreeMap,
-    time::Duration,
-};
+use std::collections::BTreeMap;
 use uuid::Uuid;
 
 use crate::{
@@ -42,13 +38,7 @@ impl Database for MemoryDB {
     }
 
     fn sync_delete_table(&self) {
-        if let None = smol::run(async {
-            self.delete_table()
-                .timeout(Duration::from_secs(1))
-                .await
-        }) {
-            panic!("sync_delete_table: timed out");
-        };
+        let _ = smol::run(async { self.delete_table().await });
     }
 
     async fn create_table(
@@ -58,15 +48,8 @@ impl Database for MemoryDB {
     }
 
     fn sync_create_table(&self) {
-        if let None = smol::run(async {
-            self.create_table()
-                .timeout(Duration::from_secs(1))
-                .await
-        }) {
-            panic!("sync_create_table: timed out");
-        };
+        let _ = smol::run(async { self.create_table().await });
     }
-
 
     async fn get_item<S>(
         &self,
