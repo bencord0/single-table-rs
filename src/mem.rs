@@ -128,9 +128,11 @@ impl Database for MemoryDB {
                     }
                 }
 
-
                 items.push(hash_map.clone());
-                count += 1;
+                count = match count.checked_add(1) {
+                    Some(count) => count,
+                    None => break,
+                };
             }
         }
 
