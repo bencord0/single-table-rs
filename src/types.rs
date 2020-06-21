@@ -1,5 +1,5 @@
-use std::collections;
 pub use rusoto_core::RusotoError;
+use std::collections;
 
 #[rustfmt::skip]
 pub use rusoto_dynamodb::{

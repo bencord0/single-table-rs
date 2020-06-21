@@ -1,5 +1,5 @@
-use async_trait::async_trait;
 use crate::types;
+use async_trait::async_trait;
 
 #[async_trait]
 pub trait Database {
@@ -12,7 +12,10 @@ pub trait Database {
     async fn delete_table(&self) -> types::DeleteTableResult;
 
     async fn get_item<S: Into<String> + Send>(&self, pk: S, sk: Option<S>) -> types::GetItemResult;
-    async fn put_item<H: Into<types::HashMap> + Key + Send>(&self, hashmap: H) -> types::PutItemResult;
+    async fn put_item<H: Into<types::HashMap> + Key + Send>(
+        &self,
+        hashmap: H,
+    ) -> types::PutItemResult;
     async fn query<S: Into<String> + Send>(&self, pk: S, sk: S) -> types::QueryResult;
 }
 

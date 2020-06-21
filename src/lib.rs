@@ -3,8 +3,8 @@ use serde::{Deserialize, Serialize};
 
 pub mod ddb;
 pub mod mem;
-pub mod types;
 pub mod traits;
+pub mod types;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Model {

@@ -11,7 +11,9 @@ fn test_get_none() {
     {
         let item = get_item_output.item;
         assert_eq!(item, None);
-    } else { assert!(false); }
+    } else {
+        assert!(false);
+    }
 
     ddb.sync_delete_table();
 }
@@ -46,7 +48,9 @@ fn test_put_get_some() {
         if let Ok(model) = model {
             println!("{:?}", model);
         }
-    } else { assert!(false); }
+    } else {
+        assert!(false);
+    }
 
     ddb.sync_delete_table();
 }
@@ -99,7 +103,9 @@ fn test_get_submodels() {
             };
             submodels.push(sm);
         }
-    } else { assert!(false); }
+    } else {
+        assert!(false);
+    }
 
     println!("{:#?}", submodels);
     assert_eq!(submodels.len(), 2);

@@ -16,10 +16,7 @@ use rusoto_dynamodb::{
 };
 
 use crate::{
-    traits::{
-        Database,
-        Key,
-    },
+    traits::{Database, Key},
     types::*,
 };
 
@@ -42,14 +39,11 @@ pub fn dynamodb() -> DDB {
 
 #[async_trait]
 impl Database for DDB {
-
     fn table_name(&self) -> String {
         self.1.clone()
     }
 
-    async fn delete_table(
-        &self,
-    ) -> DeleteTableResult {
+    async fn delete_table(&self) -> DeleteTableResult {
         self.0
             .delete_table(DeleteTableInput {
                 table_name: self.table_name(),
@@ -59,18 +53,13 @@ impl Database for DDB {
     }
 
     fn sync_delete_table(&self) {
-        if let None = smol::run(async {
-            self.delete_table()
-                .timeout(Duration::from_secs(1))
-                .await
-        }) {
+        if let None = smol::run(async { self.delete_table().timeout(Duration::from_secs(1)).await })
+        {
             panic!("sync_delete_table: timed out");
         };
     }
 
-    async fn create_table(
-        &self,
-    ) -> CreateTableResult {
+    async fn create_table(&self) -> CreateTableResult {
         self.0
             .create_table(CreateTableInput {
                 table_name: self.table_name(),
@@ -99,25 +88,18 @@ impl Database for DDB {
                     write_capacity_units: 1,
                 }),
                 ..Default::default()
-            }).await
+            })
+            .await
     }
 
     fn sync_create_table(&self) {
-        if let None = smol::run(async {
-            self.create_table()
-                .timeout(Duration::from_secs(1))
-                .await
-        }) {
+        if let None = smol::run(async { self.create_table().timeout(Duration::from_secs(1)).await })
+        {
             panic!("sync_create_table: timed out");
         };
     }
 
-
-    async fn get_item<S>(
-        &self,
-        pk: S,
-        sk: Option<S>,
-    ) -> GetItemResult
+    async fn get_item<S>(&self, pk: S, sk: Option<S>) -> GetItemResult
     where
         S: Into<String> + Send,
     {
@@ -148,13 +130,9 @@ impl Database for DDB {
             .await
     }
 
-
-    async fn put_item<H>(
-        &self,
-        item: H,
-    ) -> PutItemResult
+    async fn put_item<H>(&self, item: H) -> PutItemResult
     where
-        H: Into<HashMap> + Key + Send
+        H: Into<HashMap> + Key + Send,
     {
         self.0
             .put_item(PutItemInput {
