@@ -44,22 +44,13 @@ impl Database for MemoryDB {
     where
         S: Into<String> + Send,
     {
-        let key = (
-            pk.into(),
-            match sk {
-                Some(sk) => Some(sk.into()),
-                None => None,
-            },
-        );
+        let key = (pk.into(), sk.map(|sk| sk.into()));
 
         let db = self.0.lock().await;
-        let item = match db.get(&key) {
-            Some(item) => Some(item.clone()),
-            None => None,
-        };
+        let item = db.get(&key);
 
         Ok(GetItemOutput {
-            item: item,
+            item: item.cloned(),
             ..Default::default()
         })
     }
@@ -93,9 +84,11 @@ impl Database for MemoryDB {
                     }
                 }
 
-                items.push(hash_map.clone());
                 count = match count.checked_add(1) {
-                    Some(count) => count,
+                    Some(count) => {
+                        items.push(hash_map.clone());
+                        count
+                    }
                     None => break,
                 };
             }

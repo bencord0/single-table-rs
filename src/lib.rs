@@ -35,6 +35,10 @@ impl Model {
     pub fn name(&self) -> &str {
         &self.name
     }
+
+    pub fn value(&self) -> i32 {
+        self.a_number
+    }
 }
 
 impl traits::Key for Model {
