@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 pub mod ddb;
+pub mod mem;
 pub mod types;
 pub mod traits;
 
@@ -36,6 +37,12 @@ impl Model {
     }
 }
 
+impl traits::Key for Model {
+    fn key(&self) -> (String, Option<String>) {
+        (self.pk.clone(), Some(self.sk.clone()))
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SubModel {
     name: String,
@@ -65,5 +72,11 @@ impl SubModel {
 
     pub fn name(&self) -> String {
         self.name.clone()
+    }
+}
+
+impl traits::Key for SubModel {
+    fn key(&self) -> (String, Option<String>) {
+        (self.pk.clone(), Some(self.sk.clone()))
     }
 }

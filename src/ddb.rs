@@ -15,15 +15,12 @@ use rusoto_dynamodb::{
 
 };
 
-#[rustfmt::skip]
-use crate::types::{
-    HashMap,
-
-    CreateTableInput, CreateTableResult,
-    DeleteTableInput, DeleteTableResult,
-    GetItemInput, GetItemResult,
-    PutItemInput, PutItemResult,
-    QueryInput, QueryResult,
+use crate::{
+    traits::{
+        Database,
+        Key,
+    },
+    types::*,
 };
 
 pub struct DDB(DynamoDbClient, String);
@@ -39,12 +36,12 @@ pub fn dynamodb() -> DDB {
 
     DDB(DynamoDbClient::new(region), {
         let uuid = uuid::Uuid::new_v4();
-        format!("models-rs-{}", uuid.to_hyphenated().to_string())
+        format!("single-table-{}", uuid.to_hyphenated().to_string())
     })
 }
 
 #[async_trait]
-impl crate::traits::Database for DDB {
+impl Database for DDB {
 
     fn table_name(&self) -> String {
         self.1.clone()
@@ -152,14 +149,17 @@ impl crate::traits::Database for DDB {
     }
 
 
-    async fn put_item(
+    async fn put_item<H>(
         &self,
-        item: HashMap,
-    ) -> PutItemResult {
+        item: H,
+    ) -> PutItemResult
+    where
+        H: Into<HashMap> + Key + Send
+    {
         self.0
             .put_item(PutItemInput {
                 table_name: self.table_name(),
-                item,
+                item: item.into(),
                 ..Default::default()
             })
             .await
