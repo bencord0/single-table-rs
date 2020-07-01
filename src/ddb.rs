@@ -1,7 +1,6 @@
 use async_trait::async_trait;
-use rusoto_core::Region;
 use smol_timeout::TimeoutExt;
-use std::{env, time::Duration};
+use std::time::Duration;
 
 #[rustfmt::skip]
 use rusoto_dynamodb::{
@@ -13,6 +12,8 @@ use rusoto_dynamodb::{
     AttributeDefinition,
     AttributeValue,
 
+    GlobalSecondaryIndex,
+    Projection,
 };
 
 use crate::{
@@ -22,19 +23,10 @@ use crate::{
 
 pub struct DDB(DynamoDbClient, String);
 
-pub fn dynamodb() -> DDB {
-    env::set_var("AWS_ACCESS_KEY_ID", "local");
-    env::set_var("AWS_SECRET_ACCESS_KEY", "local");
-
-    let region = Region::Custom {
-        name: "local".to_owned(),
-        endpoint: "http://localhost:2000".to_owned(),
-    };
-
-    DDB(DynamoDbClient::new(region), {
-        let uuid = uuid::Uuid::new_v4();
-        format!("single-table-{}", uuid.to_hyphenated().to_string())
-    })
+impl DDB {
+    pub fn new<T: Into<String>>(client: DynamoDbClient, table_name: T) -> Self {
+        Self(client, table_name.into())
+    }
 }
 
 #[async_trait]
@@ -82,7 +74,34 @@ impl Database for DDB {
                         attribute_name: "sk".to_string(),
                         attribute_type: "S".to_string(),
                     },
+                    AttributeDefinition {
+                        attribute_name: "model".to_string(),
+                        attribute_type: "S".to_string(),
+                    },
                 ],
+                global_secondary_indexes: Some(vec![
+                    GlobalSecondaryIndex {
+                        index_name: "models".to_string(),
+                        key_schema: vec![
+                            KeySchemaElement {
+                                attribute_name: "model".to_string(),
+                                key_type: "HASH".to_string(),
+                            },
+                            KeySchemaElement {
+                                attribute_name: "pk".to_string(),
+                                key_type: "RANGE".to_string(),
+                            },
+                        ],
+                        projection: Projection {
+                            projection_type: Some("ALL".to_string()),
+                            ..Default::default()
+                        },
+                        provisioned_throughput: Some(ProvisionedThroughput {
+                            read_capacity_units: 1,
+                            write_capacity_units: 1,
+                        }),
+                    },
+                ]),
                 provisioned_throughput: Some(ProvisionedThroughput {
                     read_capacity_units: 1,
                     write_capacity_units: 1,
@@ -97,6 +116,15 @@ impl Database for DDB {
         {
             panic!("sync_create_table: timed out");
         };
+    }
+
+    async fn describe_table(&self) -> DescribeTableResult {
+        self.0
+            .describe_table(DescribeTableInput {
+                table_name: self.table_name(),
+                ..Default::default()
+            })
+            .await
     }
 
     async fn get_item<S>(&self, pk: S, sk: Option<S>) -> GetItemResult

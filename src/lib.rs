@@ -1,8 +1,11 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+pub mod args;
 pub mod ddb;
+pub mod env;
 pub mod mem;
+pub mod sts;
 pub mod traits;
 pub mod types;
 
@@ -12,8 +15,11 @@ pub struct Model {
     a_number: i32,
 
     created_at: DateTime<Utc>,
+
+    // These are used as dynamodb key attributes
     pk: String,
     sk: String,
+    model: String,
 }
 
 impl Model {
@@ -25,6 +31,7 @@ impl Model {
         Self {
             pk: format!("model#{}", name.clone()),
             sk: format!("model#{}", name.clone()),
+            model: "model".to_string(),
 
             name: name,
             created_at: Utc::now(),
@@ -39,6 +46,10 @@ impl Model {
     pub fn value(&self) -> i32 {
         self.a_number
     }
+
+    fn sk(&self) -> String {
+        self.sk.clone()
+    }
 }
 
 impl traits::Key for Model {
@@ -50,26 +61,28 @@ impl traits::Key for Model {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SubModel {
     name: String,
-    model: Model,
+    parent: String,
 
     created_at: DateTime<Utc>,
 
     pk: String,
     sk: String,
+    model: String,
 }
 
 impl SubModel {
-    pub fn new<'a, S>(name: S, model: Model) -> Self
+    pub fn new<'a, S>(name: S, parent: Model) -> Self
     where
         S: Into<String>,
     {
         let name = name.into();
         Self {
-            pk: format!("model#{}", model.name()),
-            sk: format!("model#{}#submodel#{}", model.name(), &name),
+            pk: format!("model#{}", parent.name()),
+            sk: format!("model#{}#submodel#{}", parent.name(), &name),
+            model: "submodel".to_string(),
 
             name: name,
-            model: model,
+            parent: parent.sk(),
             created_at: Utc::now(),
         }
     }

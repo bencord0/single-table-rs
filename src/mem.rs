@@ -13,7 +13,7 @@ pub struct MemoryDB(Mutex<BTreeMap<(String, Option<String>), HashMap>>, String);
 pub fn memorydb() -> MemoryDB {
     MemoryDB(Mutex::new(BTreeMap::new()), {
         let uuid = Uuid::new_v4();
-        format!("single-table-{}", uuid.to_hyphenated().to_string())
+        format!("single-table-{}", uuid.to_hyphenated())
     })
 }
 
@@ -38,6 +38,10 @@ impl Database for MemoryDB {
 
     fn sync_create_table(&self) {
         let _ = smol::run(async { self.create_table().await });
+    }
+
+    async fn describe_table(&self) -> DescribeTableResult {
+        Ok(Default::default())
     }
 
     async fn get_item<S>(&self, pk: S, sk: Option<S>) -> GetItemResult
