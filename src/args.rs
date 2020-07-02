@@ -13,6 +13,7 @@ pub struct Opts {
     #[clap(long, env = "AWS_REGION")]
     pub aws_region: Option<String>,
 
+    /// The DynamoDB Table Name (you only need one)
     #[clap(long, default_value = "single-table")]
     pub table_name: String,
 
@@ -22,14 +23,22 @@ pub struct Opts {
 
 #[derive(Clap, Debug)]
 pub enum Commands {
+    /// Create the DynamoDB Table using the predefined schema.
     Create,
+    /// Discribe the DynamoDB Table schema.
     Describe,
+    /// Scan for all items in the DynamoDB Table (or an index).
     Scan(ScanOpts),
 
-    Get(GetOpts),
+    /// Put Items into the DynamdoDB Table.
     Put(PutOpts),
+    /// Get an Item by `pk` and optional `sk`.
+    Get(GetOpts),
+    /// Query for Items by `pk` and optional `sk`.
     Query(QueryOpts),
 
+    /// Return details about the current IAM user credentials.
+    /// This is a demonstration of other rusoto APIs.
     #[clap(name = "whoami")]
     WhoAmI,
 }
