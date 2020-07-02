@@ -2,7 +2,7 @@ use clap::Clap;
 use rusoto_dynamodb::DynamoDbClient;
 use rusoto_sts::StsClient;
 use single_table::{
-    args::{Commands, GetOpts, Opts, PutOpts, ScanOpts},
+    args::{Commands, GetOpts, Opts, PutOpts, QueryOpts, ScanOpts},
     ddb::DDB,
     env,
     sts::STS,
@@ -37,6 +37,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             Commands::Put(opts) => put(db, opts).await?,
             Commands::Get(opts) => get(db, opts).await?,
+            Commands::Query(opts) => query(db, opts).await?,
 
             Commands::WhoAmI => whoami(sts).await?,
         }
@@ -119,6 +120,27 @@ async fn get(db: DDB, opts: GetOpts) -> Result<(), Box<dyn Error>> {
             .map(|item| println!("{:#?}", item));
     } else {
         println!("{:?}", res);
+    }
+
+    Ok(())
+}
+
+async fn query(db: DDB, opts: QueryOpts) -> Result<(), Box<dyn Error>> {
+    let pk = format!("model#{}", opts.pk);
+    let sk = match opts.sk {
+        Some(sk) => format!("model#{}#submodel#{}", opts.pk, sk),
+        None => format!("model#{}", opts.pk),
+    };
+
+    let res = db.query(pk, sk).await?;
+    if let Some(hashmaps) = res.items {
+        for hashmap in hashmaps {
+            let _ = Model::from_hashmap(&hashmap)
+                .map(|item| println!("{:#?}", item));
+
+            let _ = SubModel::from_hashmap(&hashmap)
+                .map(|item| println!("{:#?}", item));
+        }
     }
 
     Ok(())

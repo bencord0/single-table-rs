@@ -28,6 +28,7 @@ pub enum Commands {
 
     Get(GetOpts),
     Put(PutOpts),
+    Query(QueryOpts),
 
     #[clap(name = "whoami")]
     WhoAmI,
@@ -55,6 +56,12 @@ pub struct PutOpts {
 
     #[clap(long)]
     pub submodels: Vec<SubmodelOpts>,
+}
+
+#[derive(Clap, Debug)]
+pub struct QueryOpts {
+    pub pk: String,
+    pub sk: Option<String>,
 }
 
 #[derive(Clap, Debug)]
