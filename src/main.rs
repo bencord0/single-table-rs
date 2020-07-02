@@ -60,13 +60,21 @@ async fn scan(db: DDB, opts: ScanOpts) -> Result<(), Box<dyn Error>> {
     let index = opts.index.clone();
     let res = db.scan(opts.index, opts.limit).await?;
 
-    println!("{}({:?}): {:#?}", db.table_name(), index, res);
-    Ok(())
-}
+    println!("TableName: {}", db.table_name());
+    if let Some(index) = index {
+        println!("IndexName: {}", index);
+    }
 
-async fn whoami(sts: STS) -> Result<(), Box<dyn Error>> {
-    let caller_id = sts.get_caller_identity().await?;
-    println!("{:?}", caller_id);
+    if let Some(hashmaps) = res.items {
+        for hashmap in hashmaps {
+            let _ = Model::from_hashmap(&hashmap)
+                .map(|item| println!("{:#?}", item));
+
+            let _ = SubModel::from_hashmap(&hashmap)
+                .map(|item| println!("{:#?}", item));
+        }
+    }
+
     Ok(())
 }
 
@@ -89,5 +97,11 @@ async fn put(db: DDB, opts: PutOpts) -> Result<(), Box<dyn Error>> {
         let res = db.put_item(hashmap).await?;
         println!("{:#?}", res);
     }
+    Ok(())
+}
+
+async fn whoami(sts: STS) -> Result<(), Box<dyn Error>> {
+    let caller_id = sts.get_caller_identity().await?;
+    println!("{:?}", caller_id);
     Ok(())
 }

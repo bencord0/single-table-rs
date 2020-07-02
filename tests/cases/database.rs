@@ -49,7 +49,7 @@ fn test_put_get_some<DB: Database>(db: DB) -> Result<(), Box<dyn Error>> {
         .item
         .unwrap_or_else(|| types::HashMap::new());
 
-    let model: Model = serde_dynamodb::from_hashmap(item)?;
+    let model = Model::from_hashmap(&item)?;
     println!("{:?}", model);
     assert_eq!(model.name(), "foo");
     assert_eq!(model.value(), 1);
@@ -67,7 +67,7 @@ fn test_get_submodels<DB: Database>(db: DB) -> Result<(), Box<dyn Error>> {
 
     let mut submodels: Vec<SubModel> = vec![];
     for item in items.items.ok_or(".items is Some")? {
-        let sm: SubModel = serde_dynamodb::from_hashmap(item)?;
+        let sm = SubModel::from_hashmap(&item)?;
         submodels.push(sm);
     }
 

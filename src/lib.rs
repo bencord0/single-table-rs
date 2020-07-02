@@ -39,12 +39,20 @@ impl Model {
         }
     }
 
+    pub fn from_hashmap(hashmap: &types::HashMap) -> serde_dynamodb::error::Result<Self> {
+        serde_dynamodb::from_hashmap(hashmap.to_owned())
+    }
+
     pub fn name(&self) -> &str {
         &self.name
     }
 
     pub fn value(&self) -> i32 {
         self.a_number
+    }
+
+    fn pk(&self) -> String {
+        self.pk.clone()
     }
 
     fn sk(&self) -> String {
@@ -54,7 +62,7 @@ impl Model {
 
 impl traits::Key for Model {
     fn key(&self) -> (String, Option<String>) {
-        (self.pk.clone(), Some(self.sk.clone()))
+        (self.pk(), Some(self.sk()))
     }
 }
 
@@ -87,13 +95,25 @@ impl SubModel {
         }
     }
 
+    pub fn from_hashmap(hashmap: &types::HashMap) -> serde_dynamodb::error::Result<Self> {
+        serde_dynamodb::from_hashmap(hashmap.to_owned())
+    }
+
     pub fn name(&self) -> String {
         self.name.clone()
+    }
+
+    pub fn pk(&self) -> String {
+        self.pk.clone()
+    }
+
+    pub fn sk(&self) -> String {
+        self.sk.clone()
     }
 }
 
 impl traits::Key for SubModel {
     fn key(&self) -> (String, Option<String>) {
-        (self.pk.clone(), Some(self.sk.clone()))
+        (self.pk(), Some(self.sk()))
     }
 }
