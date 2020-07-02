@@ -1,13 +1,17 @@
 use clap::Clap;
 use rusoto_dynamodb::DynamoDbClient;
+use rusoto_sts::StsClient;
 use single_table::{
     args::{
         Commands, Opts, PutOpts,
     },
-    ddb::{DDB},
+    ddb::DDB,
     env,
-    sts::get_caller_identity,
-    traits::Database,
+    sts::STS,
+    traits::{
+        Database,
+        SecurityTokens,
+    },
     Model, SubModel,
 };
 use std::{
@@ -20,16 +24,18 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let region = env::resolve_region(opts.aws_region.clone(), opts.aws_endpoint_url.clone())?;
     println!("{:?}", region);
+
     let db = DDB::new(
-        DynamoDbClient::new(region),
+        DynamoDbClient::new(region.clone()),
         &opts.table_name,
     );
+    let sts = STS::new(StsClient::new(region.clone()));
 
     smol::run(async {
         match opts.commands {
             Commands::Create => create(db).await?,
             Commands::Describe => describe(db).await?,
-            Commands::WhoAmI => whoami().await?,
+            Commands::WhoAmI => whoami(sts).await?,
             Commands::Put(opts) => put(db, opts).await?,
         }
         Ok(())
@@ -51,8 +57,8 @@ async fn describe(db: DDB) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-async fn whoami() -> Result<(), Box<dyn Error>> {
-    let caller_id = get_caller_identity().await?;
+async fn whoami(sts: STS) -> Result<(), Box<dyn Error>> {
+    let caller_id = sts.get_caller_identity().await?;
     println!("{:?}", caller_id);
     Ok(())
 }

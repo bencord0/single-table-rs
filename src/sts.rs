@@ -1,28 +1,29 @@
-use rusoto_core::Region;
+use async_trait::async_trait;
 
 #[rustfmt::skip]
 use rusoto_sts::{
-        Sts,
-        StsClient,
+    Sts,
+    StsClient,
 };
 
 use crate::{
-    env,
     types::*,
+    traits::SecurityTokens,
 };
 
-pub async fn get_caller_identity() -> GetCallerIdentityResult {
-    env::set_default_var("AWS_ACCESS_KEY_ID" ,"local").unwrap();
-    env::set_default_var("AWS_SECRET_ACCESS_KEY", "local").unwrap();
+pub struct STS(StsClient);
 
-    let region = Region::Custom {
-        name: "local".to_string(),
-        endpoint: "http://localhost:2000".to_string(),
-    };
+impl STS {
+    pub fn new(client: StsClient) -> Self {
+        Self(client)
+    }
+}
 
-    let sts = StsClient::new(region);
-
-    sts.get_caller_identity(GetCallerIdentityRequest{
-        ..Default::default()
-    }).await
+#[async_trait]
+impl SecurityTokens for STS {
+    async fn get_caller_identity(&self) -> GetCallerIdentityResult {
+        self.0.get_caller_identity(GetCallerIdentityRequest{
+            ..Default::default()
+        }).await
+    }
 }

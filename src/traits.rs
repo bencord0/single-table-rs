@@ -41,3 +41,8 @@ impl Key for types::HashMap {
         )
     }
 }
+
+#[async_trait]
+pub trait SecurityTokens {
+    async fn get_caller_identity(&self) -> types::GetCallerIdentityResult;
+}
