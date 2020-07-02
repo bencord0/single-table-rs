@@ -24,10 +24,20 @@ pub struct Opts {
 pub enum Commands {
     Create,
     Describe,
+    Scan(ScanOpts),
     Put(PutOpts),
 
     #[clap(name = "whoami")]
     WhoAmI,
+}
+
+#[derive(Clap, Debug)]
+pub struct ScanOpts {
+    #[clap(long)]
+    pub index: Option<String>,
+
+    #[clap(long)]
+    pub limit: Option<i64>,
 }
 
 #[derive(Clap, Debug)]

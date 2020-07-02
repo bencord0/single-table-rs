@@ -44,6 +44,10 @@ impl<DB: Database + Send + Sync> Database for TemporaryDatabase<DB> {
         self.0.describe_table().await
     }
 
+    async fn scan<S: Into<String> + Send>(&self, index_name: Option<S>, limit: Option<i64>) -> types::ScanResult {
+        self.0.scan(index_name, limit).await
+    }
+
     async fn get_item<S: Into<String> + Send>(&self, pk: S, sk: Option<S>) -> types::GetItemResult {
         self.0.get_item(pk, sk).await
     }

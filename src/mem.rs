@@ -44,6 +44,34 @@ impl Database for MemoryDB {
         Ok(Default::default())
     }
 
+    async fn scan<S>(&self, _index_name: Option<S>, limit: Option<i64>) -> ScanResult
+    where
+        S: Into<String> + Send,
+    {
+        let mut items: Vec<HashMap> = vec![];
+
+        let db = self.0.lock().await;
+        for (i, item) in db.values().cloned().enumerate() {
+            if let Some(limit) = limit {
+                if i as i64 >= limit {
+                    break
+                }
+            }
+
+            items.push(item);
+        }
+
+        let count = Some(items.len() as i64);
+        let scanned_count = Some(items.len() as i64);
+
+        Ok(ScanOutput {
+            items: Some(items),
+            count,
+            scanned_count,
+            ..Default::default()
+        })
+    }
+
     async fn get_item<S>(&self, pk: S, sk: Option<S>) -> GetItemResult
     where
         S: Into<String> + Send,

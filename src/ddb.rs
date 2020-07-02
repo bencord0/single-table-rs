@@ -127,6 +127,21 @@ impl Database for DDB {
             .await
     }
 
+    async fn scan<S>(&self, index_name: Option<S>, limit: Option<i64>) -> ScanResult
+    where
+        S: Into<String> + Send,
+    {
+        let index_name: Option<String> = index_name.map(|idx| idx.into());
+        self.0
+            .scan(ScanInput {
+                table_name: self.table_name(),
+                index_name,
+                limit,
+                ..Default::default()
+            })
+            .await
+    }
+
     async fn get_item<S>(&self, pk: S, sk: Option<S>) -> GetItemResult
     where
         S: Into<String> + Send,

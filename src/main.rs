@@ -2,9 +2,7 @@ use clap::Clap;
 use rusoto_dynamodb::DynamoDbClient;
 use rusoto_sts::StsClient;
 use single_table::{
-    args::{
-        Commands, Opts, PutOpts,
-    },
+    args::{Commands, Opts, PutOpts, ScanOpts},
     ddb::DDB,
     env,
     sts::STS,
@@ -35,6 +33,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         match opts.commands {
             Commands::Create => create(db).await?,
             Commands::Describe => describe(db).await?,
+            Commands::Scan(opts) => scan(db, opts).await?,
             Commands::WhoAmI => whoami(sts).await?,
             Commands::Put(opts) => put(db, opts).await?,
         }
@@ -54,6 +53,14 @@ async fn describe(db: DDB) -> Result<(), Box<dyn Error>> {
     let res = db.describe_table().await;
 
     println!("{}: {:#?}", db.table_name(), res);
+    Ok(())
+}
+
+async fn scan(db: DDB, opts: ScanOpts) -> Result<(), Box<dyn Error>> {
+    let index = opts.index.clone();
+    let res = db.scan(opts.index, opts.limit).await?;
+
+    println!("{}({:?}): {:#?}", db.table_name(), index, res);
     Ok(())
 }
 

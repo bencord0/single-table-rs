@@ -11,6 +11,7 @@ pub trait Database {
     async fn create_table(&self) -> types::CreateTableResult;
     async fn delete_table(&self) -> types::DeleteTableResult;
     async fn describe_table(&self) -> types::DescribeTableResult;
+    async fn scan<S: Into<String> + Send>(&self, index_name: Option<S>, limit: Option<i64>) -> types::ScanResult;
 
     async fn get_item<S: Into<String> + Send>(&self, pk: S, sk: Option<S>) -> types::GetItemResult;
     async fn put_item<H: Into<types::HashMap> + Key + Send>(
