@@ -25,6 +25,8 @@ pub enum Commands {
     Create,
     Describe,
     Scan(ScanOpts),
+
+    Get(GetOpts),
     Put(PutOpts),
 
     #[clap(name = "whoami")]
@@ -38,6 +40,12 @@ pub struct ScanOpts {
 
     #[clap(long)]
     pub limit: Option<i64>,
+}
+
+#[derive(Clap, Debug)]
+pub struct GetOpts {
+    pub pk: String,
+    pub sk: Option<String>,
 }
 
 #[derive(Clap, Debug)]
