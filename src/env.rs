@@ -18,6 +18,16 @@ pub fn set_default_var<K: AsRef<OsStr>, V: AsRef<OsStr>>(key: K, val: V) -> Resu
     }
 }
 
+// Retrieve environment variable, or panic
+pub fn ensure_var<K: AsRef<OsStr>>(key: K) -> String {
+    env::var(key.as_ref()).expect(r#"
+
+Set AWS_ENDPOINT_URL to run tests.
+    example: `export AWS_ENDPOINT_URL=http://localhost:2000`
+
+"#)
+}
+
 pub fn resolve_region(aws_region: Option<String>, aws_endpoint_url: Option<String>) -> Result<Region, Box<dyn std::error::Error>> {
     let region: Region = match (aws_region.as_ref(), aws_endpoint_url.as_ref()) {
         // User fully specified Region details

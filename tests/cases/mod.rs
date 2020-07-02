@@ -9,7 +9,8 @@ mod database;
 fn dynamodb() -> TemporaryDatabase<ddb::DDB> {
     // Connect to dynamodb-local
     // There's a script in `/scripts/start-ddb.sh` to set one up with docker
-    let region = env::resolve_region(None, Some("http://localhost:2000".to_string())).unwrap();
+    let endpoint_url = env::ensure_var("AWS_ENDPOINT_URL");
+    let region = env::resolve_region(None, Some(endpoint_url)).unwrap();
     let db = ddb::DDB::new(
         DynamoDbClient::new(region),
         {
