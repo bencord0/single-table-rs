@@ -126,20 +126,30 @@ async fn get(db: DDB, opts: GetOpts) -> Result<(), Box<dyn Error>> {
 }
 
 async fn query(db: DDB, opts: QueryOpts) -> Result<(), Box<dyn Error>> {
-    let pk = format!("model#{}", opts.pk);
-    let sk = match opts.sk {
-        Some(sk) => format!("model#{}#submodel#{}", opts.pk, sk),
-        None => format!("model#{}", opts.pk),
+    let (pk, sk) = match &opts.index {
+        Some(index) if index == "model" => match opts.sk {
+            Some(sk) => (
+                "submodel".to_string(),
+                format!("model#{}#submodel#{}", opts.pk, sk),
+            ),
+            None => ("model".to_string(), format!("model#{}", opts.pk)),
+        },
+        None | Some(_) => {
+            let pk = format!("model#{}", opts.pk);
+            let sk = match opts.sk {
+                Some(sk) => format!("model#{}#submodel#{}", opts.pk, sk),
+                None => format!("model#{}", opts.pk),
+            };
+            (pk, sk)
+        }
     };
 
-    let res = db.query(pk, sk).await?;
+    let res = db.query(opts.index, pk, sk).await?;
     if let Some(hashmaps) = res.items {
         for hashmap in hashmaps {
-            let _ = Model::from_hashmap(&hashmap)
-                .map(|item| println!("{:#?}", item));
+            let _ = Model::from_hashmap(&hashmap).map(|item| println!("{:#?}", item));
 
-            let _ = SubModel::from_hashmap(&hashmap)
-                .map(|item| println!("{:#?}", item));
+            let _ = SubModel::from_hashmap(&hashmap).map(|item| println!("{:#?}", item));
         }
     }
 

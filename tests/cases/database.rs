@@ -58,11 +58,11 @@ fn test_put_get_some<DB: Database>(db: DB) -> Result<(), Box<dyn Error>> {
 }
 
 #[rstest(db, case::ddb(dynamodb()), case::mem(mem::memorydb()))]
-fn test_get_submodels<DB: Database>(db: DB) -> Result<(), Box<dyn Error>> {
+fn test_query_submodels<DB: Database>(db: DB) -> Result<(), Box<dyn Error>> {
     insert_models(&db)?;
 
     let items: rusoto_dynamodb::QueryOutput =
-        smol::run(db.query("model#foo", "model#foo#submodel#"))?;
+        smol::run(db.query(None, "model#foo", "model#foo#submodel#"))?;
     assert_eq!(items.count, Some(2));
 
     let mut submodels: Vec<SubModel> = vec![];
@@ -80,11 +80,52 @@ fn test_get_submodels<DB: Database>(db: DB) -> Result<(), Box<dyn Error>> {
 }
 
 #[rstest(db, case::ddb(dynamodb()), case::mem(mem::memorydb()))]
+fn test_query_index_model<DB: Database>(db: DB) -> Result<(), Box<dyn Error>> {
+    insert_models(&db)?;
+
+    let items: rusoto_dynamodb::QueryOutput =
+        smol::run(db.query(Some("model"), "model", "model#foo"))?;
+    assert_eq!(items.count, Some(1));
+
+    let mut models: Vec<Model> = vec![];
+    for item in items.items.ok_or(".items is Some")? {
+        let sm = Model::from_hashmap(&item)?;
+        models.push(sm);
+    }
+
+    println!("{:#?}", models);
+    assert_eq!(models.len(), 1);
+    assert_eq!(models[0].name(), "foo");
+
+    Ok(())
+}
+
+#[rstest(db, case::ddb(dynamodb()), case::mem(mem::memorydb()))]
+fn test_query_index_submodel<DB: Database>(db: DB) -> Result<(), Box<dyn Error>> {
+    insert_models(&db)?;
+
+    let items: rusoto_dynamodb::QueryOutput =
+        smol::run(db.query(Some("model"), "submodel", "model#foo#submodel#bar"))?;
+    assert_eq!(items.count, Some(1));
+
+    let mut submodels: Vec<SubModel> = vec![];
+    for item in items.items.ok_or(".items is Some")? {
+        let sm = SubModel::from_hashmap(&item)?;
+        submodels.push(sm);
+    }
+
+    println!("{:#?}", submodels);
+    assert_eq!(submodels.len(), 1);
+    assert_eq!(submodels[0].name(), "bar");
+
+    Ok(())
+}
+
+#[rstest(db, case::ddb(dynamodb()), case::mem(mem::memorydb()))]
 fn test_scan<DB: Database>(db: DB) -> Result<(), Box<dyn Error>> {
     insert_models(&db)?;
 
-    let items: rusoto_dynamodb::ScanOutput =
-        smol::run(db.scan(None::<String>, None))?;
+    let items: rusoto_dynamodb::ScanOutput = smol::run(db.scan(None::<String>, None))?;
     assert_eq!(items.count, Some(3));
     assert_eq!(items.scanned_count, Some(3));
 
@@ -96,8 +137,7 @@ fn test_scan<DB: Database>(db: DB) -> Result<(), Box<dyn Error>> {
 fn test_scan_index<DB: Database>(db: DB) -> Result<(), Box<dyn Error>> {
     insert_models(&db)?;
 
-    let items: rusoto_dynamodb::ScanOutput =
-        smol::run(db.scan(Some("models"), None))?;
+    let items: rusoto_dynamodb::ScanOutput = smol::run(db.scan(Some("model"), None))?;
     assert_eq!(items.count, Some(3));
     assert_eq!(items.scanned_count, Some(3));
 
@@ -109,8 +149,7 @@ fn test_scan_index<DB: Database>(db: DB) -> Result<(), Box<dyn Error>> {
 fn test_scan_limit<DB: Database>(db: DB) -> Result<(), Box<dyn Error>> {
     insert_models(&db)?;
 
-    let items: rusoto_dynamodb::ScanOutput =
-        smol::run(db.scan(None::<String>, Some(1)))?;
+    let items: rusoto_dynamodb::ScanOutput = smol::run(db.scan(None::<String>, Some(1)))?;
     assert_eq!(items.count, Some(1));
     assert_eq!(items.scanned_count, Some(1));
 

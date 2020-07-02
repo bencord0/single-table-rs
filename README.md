@@ -193,7 +193,7 @@ DynamoDB's `Query` API is used to retrieve multiple items (with the same `pk`). 
 to be stored within the same partition, this can be an efficient access pattern to avoid N+1 requests, or
 worse, full table `Scan`s.
 
-In this example, both `Model`s and `SubModel`s can be retrieved for a specific `pk`.
+In this example, both `Model`s and `SubModel`s can be simultaneously retrieved for a specific `pk`.
 
 ```bash
 $ cargo run -- query foo   
@@ -202,6 +202,17 @@ Model {
     a_number: 1,
     ... and other fields
 }
+SubModel {
+    name: "bar",
+    parent: "model#foo",
+    ... and other fields
+}
+```
+
+Querying by `GSI` is also available.
+
+```bash
+$ cargo run -- query --index=model foo bar
 SubModel {
     name: "bar",
     parent: "model#foo",

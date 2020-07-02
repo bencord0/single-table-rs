@@ -44,8 +44,12 @@ impl<DB: Database + Send + Sync> Database for TemporaryDatabase<DB> {
         self.0.describe_table().await
     }
 
-    async fn scan<S: Into<String> + Send>(&self, index_name: Option<S>, limit: Option<i64>) -> types::ScanResult {
-        self.0.scan(index_name, limit).await
+    async fn scan<S: Into<String> + Send>(
+        &self,
+        index: Option<S>,
+        limit: Option<i64>,
+    ) -> types::ScanResult {
+        self.0.scan(index, limit).await
     }
 
     async fn get_item<S: Into<String> + Send>(&self, pk: S, sk: Option<S>) -> types::GetItemResult {
@@ -59,8 +63,13 @@ impl<DB: Database + Send + Sync> Database for TemporaryDatabase<DB> {
         self.0.put_item(hashmap).await
     }
 
-    async fn query<S: Into<String> + Send>(&self, pk: S, sk: S) -> types::QueryResult {
-        self.0.query(pk, sk).await
+    async fn query<S: Into<String> + Send>(
+        &self,
+        index: Option<S>,
+        pk: S,
+        sk: S,
+    ) -> types::QueryResult {
+        self.0.query(index, pk, sk).await
     }
 }
 

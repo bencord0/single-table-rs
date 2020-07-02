@@ -8,23 +8,32 @@ use crate::{
     types::*,
 };
 
-pub struct MemoryDB(Mutex<BTreeMap<(String, Option<String>), HashMap>>, String);
+pub struct MemoryDB {
+    table_name: String,
+    table: Mutex<BTreeMap<(String, String), HashMap>>,
+    index: Mutex<BTreeMap<(String, String), HashMap>>,
+}
 
 pub fn memorydb() -> MemoryDB {
-    MemoryDB(Mutex::new(BTreeMap::new()), {
-        let uuid = Uuid::new_v4();
-        format!("single-table-{}", uuid.to_hyphenated())
-    })
+    MemoryDB {
+        table_name: {
+            let uuid = Uuid::new_v4();
+            format!("single-table-{}", uuid.to_hyphenated())
+        },
+        table: Mutex::new(BTreeMap::new()),
+        index: Mutex::new(BTreeMap::new()),
+    }
 }
 
 #[async_trait]
 impl Database for MemoryDB {
     fn table_name(&self) -> String {
-        self.1.clone()
+        self.table_name.clone()
     }
 
     async fn delete_table(&self) -> DeleteTableResult {
-        self.0.lock().await.clear();
+        self.table.lock().await.clear();
+        self.index.lock().await.clear();
         Ok(Default::default())
     }
 
@@ -44,17 +53,22 @@ impl Database for MemoryDB {
         Ok(Default::default())
     }
 
-    async fn scan<S>(&self, _index_name: Option<S>, limit: Option<i64>) -> ScanResult
+    async fn scan<S>(&self, index: Option<S>, limit: Option<i64>) -> ScanResult
     where
         S: Into<String> + Send,
     {
         let mut items: Vec<HashMap> = vec![];
 
-        let db = self.0.lock().await;
+        let index = index.map(|s| s.into());
+        let db = match &index {
+            None => self.table.lock().await,
+            Some(_) => self.index.lock().await,
+        };
+
         for (i, item) in db.values().cloned().enumerate() {
             if let Some(limit) = limit {
                 if i as i64 >= limit {
-                    break
+                    break;
                 }
             }
 
@@ -76,9 +90,15 @@ impl Database for MemoryDB {
     where
         S: Into<String> + Send,
     {
-        let key = (pk.into(), sk.map(|sk| sk.into()));
+        let key = (
+            pk.into(),
+            match sk {
+                Some(s) => s.into(),
+                None => "".to_string(),
+            },
+        );
 
-        let db = self.0.lock().await;
+        let db = self.table.lock().await;
         let item = db.get(&key);
 
         Ok(GetItemOutput {
@@ -92,36 +112,41 @@ impl Database for MemoryDB {
         H: Into<HashMap> + Key + Send,
     {
         let hash_map = item.into();
-        let key = hash_map.key();
-        self.0.lock().await.insert(key, hash_map);
+        self.table
+            .lock()
+            .await
+            .insert(hash_map.key(), hash_map.clone());
+        self.index
+            .lock()
+            .await
+            .insert(hash_map.model_key(), hash_map.clone());
 
         Ok(Default::default())
     }
 
-    async fn query<S>(&self, pk: S, sk: S) -> QueryResult
+    async fn query<S>(&self, index: Option<S>, pk: S, sk: S) -> QueryResult
     where
         S: Into<String> + Send,
     {
+        let index = index.map(|s| s.into());
         let pk = pk.into();
         let sk = sk.into();
         let mut items: Vec<HashMap> = vec![];
         let mut count: i64 = 0;
 
-        let db = self.0.lock().await;
-        for (key, hash_map) in db.iter() {
-            if key.0 == pk {
-                if let Some(sortkey) = &key.1 {
-                    if !sortkey.starts_with(&sk) {
-                        continue;
-                    }
-                }
+        let db = match &index {
+            None => self.table.lock().await,
+            Some(_) => self.index.lock().await,
+        };
 
+        'maxitems: for (key, hash_map) in db.iter() {
+            if key.0 == pk && key.1.starts_with(&sk) {
                 count = match count.checked_add(1) {
                     Some(count) => {
                         items.push(hash_map.clone());
                         count
                     }
-                    None => break,
+                    None => break 'maxitems,
                 };
             }
         }

@@ -71,6 +71,9 @@ pub struct PutOpts {
 pub struct QueryOpts {
     pub pk: String,
     pub sk: Option<String>,
+
+    #[clap(long)]
+    pub index: Option<String>,
 }
 
 #[derive(Clap, Debug)]

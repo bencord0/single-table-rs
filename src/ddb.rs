@@ -79,29 +79,27 @@ impl Database for DDB {
                         attribute_type: "S".to_string(),
                     },
                 ],
-                global_secondary_indexes: Some(vec![
-                    GlobalSecondaryIndex {
-                        index_name: "models".to_string(),
-                        key_schema: vec![
-                            KeySchemaElement {
-                                attribute_name: "model".to_string(),
-                                key_type: "HASH".to_string(),
-                            },
-                            KeySchemaElement {
-                                attribute_name: "pk".to_string(),
-                                key_type: "RANGE".to_string(),
-                            },
-                        ],
-                        projection: Projection {
-                            projection_type: Some("ALL".to_string()),
-                            ..Default::default()
+                global_secondary_indexes: Some(vec![GlobalSecondaryIndex {
+                    index_name: "model".to_string(),
+                    key_schema: vec![
+                        KeySchemaElement {
+                            attribute_name: "model".to_string(),
+                            key_type: "HASH".to_string(),
                         },
-                        provisioned_throughput: Some(ProvisionedThroughput {
-                            read_capacity_units: 1,
-                            write_capacity_units: 1,
-                        }),
+                        KeySchemaElement {
+                            attribute_name: "sk".to_string(),
+                            key_type: "RANGE".to_string(),
+                        },
+                    ],
+                    projection: Projection {
+                        projection_type: Some("ALL".to_string()),
+                        ..Default::default()
                     },
-                ]),
+                    provisioned_throughput: Some(ProvisionedThroughput {
+                        read_capacity_units: 1,
+                        write_capacity_units: 1,
+                    }),
+                }]),
                 provisioned_throughput: Some(ProvisionedThroughput {
                     read_capacity_units: 1,
                     write_capacity_units: 1,
@@ -127,11 +125,11 @@ impl Database for DDB {
             .await
     }
 
-    async fn scan<S>(&self, index_name: Option<S>, limit: Option<i64>) -> ScanResult
+    async fn scan<S>(&self, index: Option<S>, limit: Option<i64>) -> ScanResult
     where
         S: Into<String> + Send,
     {
-        let index_name: Option<String> = index_name.map(|idx| idx.into());
+        let index_name: Option<String> = index.map(|idx| idx.into());
         self.0
             .scan(ScanInput {
                 table_name: self.table_name(),
@@ -186,32 +184,56 @@ impl Database for DDB {
             .await
     }
 
-    async fn query<S>(&self, pk: S, sk: S) -> QueryResult
+    async fn query<S>(&self, index: Option<S>, pk: S, sk: S) -> QueryResult
     where
         S: Into<String> + Send,
     {
-        let keys = "pk = :pk AND begins_with(sk, :sk)".to_string();
-        let mut values = HashMap::new();
-        values.insert(
-            ":pk".to_string(),
-            AttributeValue {
-                s: Some(pk.into()),
-                ..Default::default()
-            },
-        );
-        values.insert(
-            ":sk".to_string(),
-            AttributeValue {
-                s: Some(sk.into()),
-                ..Default::default()
-            },
-        );
+        let index_name = index.map(|s| s.into());
+
+        let key_condition_expression = Some("#pk = :pk AND begins_with(#sk, :sk)".to_string());
+        let expression_attribute_values = {
+            let mut values = HashMap::new();
+            values.insert(
+                ":pk".to_string(),
+                AttributeValue {
+                    s: Some(pk.into()),
+                    ..Default::default()
+                },
+            );
+            values.insert(
+                ":sk".to_string(),
+                AttributeValue {
+                    s: Some(sk.into()),
+                    ..Default::default()
+                },
+            );
+            Some(values)
+        };
+
+        type Names = std::collections::HashMap<String, String>;
+        let expression_attribute_names = match index_name.as_ref() {
+            None => {
+                let mut names = Names::new();
+                names.insert("#pk".to_string(), "pk".to_string());
+                names.insert("#sk".to_string(), "sk".to_string());
+                Some(names)
+            }
+            Some(index) if index == "model" => {
+                let mut names = Names::new();
+                names.insert("#pk".to_string(), "model".to_string());
+                names.insert("#sk".to_string(), "sk".to_string());
+                Some(names)
+            }
+            Some(_) => None,
+        };
 
         self.0
             .query(QueryInput {
                 table_name: self.table_name(),
-                key_condition_expression: Some(keys),
-                expression_attribute_values: Some(values),
+                index_name,
+                key_condition_expression,
+                expression_attribute_names,
+                expression_attribute_values,
                 ..Default::default()
             })
             .await

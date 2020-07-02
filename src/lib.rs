@@ -58,11 +58,19 @@ impl Model {
     fn sk(&self) -> String {
         self.sk.clone()
     }
+
+    fn model(&self) -> String {
+        self.model.clone()
+    }
 }
 
 impl traits::Key for Model {
-    fn key(&self) -> (String, Option<String>) {
-        (self.pk(), Some(self.sk()))
+    fn key(&self) -> (String, String) {
+        (self.pk(), self.sk())
+    }
+
+    fn model_key(&self) -> (String, String) {
+        (self.model(), self.sk())
     }
 }
 
@@ -110,10 +118,18 @@ impl SubModel {
     pub fn sk(&self) -> String {
         self.sk.clone()
     }
+
+    pub fn model(&self) -> String {
+        self.model.clone()
+    }
 }
 
 impl traits::Key for SubModel {
-    fn key(&self) -> (String, Option<String>) {
-        (self.pk(), Some(self.sk()))
+    fn key(&self) -> (String, String) {
+        (self.pk(), self.sk())
+    }
+
+    fn model_key(&self) -> (String, String) {
+        (self.model(), self.sk())
     }
 }
