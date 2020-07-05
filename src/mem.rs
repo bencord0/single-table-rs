@@ -154,8 +154,15 @@ impl Database for MemoryDB {
 
     async fn transact_write_items(
         &self,
-        _transact_items: Vec<TransactWriteItem>,
+        transact_items: Vec<TransactWriteItem>,
     ) -> TransactWriteItemsResult {
+        for transact_item in transact_items {
+            if let Some(put_op) = transact_item.put {
+                let hashmap = put_op.item;
+                let _ = self.put_item(hashmap).await;
+            }
+        }
+
         Ok(Default::default())
     }
 }

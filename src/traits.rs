@@ -2,7 +2,7 @@ use crate::types;
 use async_trait::async_trait;
 
 #[async_trait]
-pub trait Database {
+pub trait Database: TransactionalOperations {
     fn table_name(&self) -> String;
 
     fn sync_create_table(&self);
@@ -35,7 +35,7 @@ pub trait Database {
     ) -> types::TransactWriteItemsResult;
 }
 
-pub trait TransactionalDatabase: Database {
+pub trait TransactionalOperations {
     fn condition_check_exists<PK, SK, M>(&self, pk: PK, sk: SK, model: M) -> types::TransactWriteItem
     where
         PK: Into<String> + Send,
@@ -45,7 +45,7 @@ pub trait TransactionalDatabase: Database {
     fn put(&self, hashmap: types::HashMap) -> types::TransactWriteItem;
 }
 
-impl<T: Database> TransactionalDatabase for T {
+impl<T: Database> TransactionalOperations for T {
     fn condition_check_exists<PK, SK, M>(&self, pk: PK, sk: SK, model: M) -> types::TransactWriteItem
     where
         PK: Into<String> + Send,

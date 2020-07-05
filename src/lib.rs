@@ -11,7 +11,7 @@ pub mod sts;
 pub mod traits;
 pub mod types;
 
-use traits::{Database, TransactionalDatabase};
+use traits::Database;
 
 #[derive(thiserror::Error, Debug)]
 enum ProgramError {

@@ -2,7 +2,7 @@ use rstest::rstest;
 use std::error::Error;
 
 use single_table::*;
-use traits::{Database, TransactionalDatabase};
+use traits::Database;
 
 use super::dynamodb;
 
@@ -163,12 +163,15 @@ fn test_transact_write_items<DB: Database>(db: DB) -> Result<(), Box<dyn Error>>
     let bar: SubModel = SubModel::new("bar", foo.clone());
 
     let _ = smol::run(foo.save(&db))?;
-    let res = smol::run(db
+    let _ = smol::run(db
         .transact_write_items(vec![
             db.condition_check_exists(foo.pk(), foo.sk(), foo.model()),
             db.put(bar.to_hashmap()?),
         ]))?;
 
+    let res = smol::run(SubModel::get(&db, "foo", "bar"))?;
     println!("{:?}", res);
+    assert_eq!(res.name(), "bar");
+
     Ok(())
 }
