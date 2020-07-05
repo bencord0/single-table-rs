@@ -1,6 +1,8 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+use std::error::Error;
+
 pub mod args;
 pub mod ddb;
 pub mod env;
@@ -8,6 +10,14 @@ pub mod mem;
 pub mod sts;
 pub mod traits;
 pub mod types;
+
+use traits::{Database, TransactionalDatabase};
+
+#[derive(thiserror::Error, Debug)]
+enum ProgramError {
+    #[error("item not found: {0}")]
+    GetNone(String),
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Model {
@@ -43,6 +53,37 @@ impl Model {
         serde_dynamodb::from_hashmap(hashmap.to_owned())
     }
 
+    pub fn to_hashmap(&self) -> serde_dynamodb::error::Result<types::HashMap> {
+        serde_dynamodb::to_hashmap(&self)
+    }
+
+    pub async fn get<DB, S>(db: &DB, name: S) -> Result<Self, Box<dyn Error>>
+    where
+        DB: Database,
+        S: Into<String>,
+    {
+        let name = name.into();
+        let pk = format!("model#{}", name);
+        let sk = pk.clone();
+
+        let res = db.get_item(pk, sk).await?;
+        if let Some(hashmap) = res.item {
+            return Ok(Self::from_hashmap(&hashmap)?);
+        }
+
+        Err(Box::new(ProgramError::GetNone(name)))
+    }
+
+    pub async fn save<DB>(&mut self, db: &DB) -> Result<(), Box<dyn Error>>
+    where
+        DB: Database,
+    {
+        let hashmap = self.to_hashmap()?;
+        let _ = db.put_item(hashmap).await?;
+
+        Ok(())
+    }
+
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -51,15 +92,15 @@ impl Model {
         self.a_number
     }
 
-    fn pk(&self) -> String {
+    pub fn pk(&self) -> String {
         self.pk.clone()
     }
 
-    fn sk(&self) -> String {
+    pub fn sk(&self) -> String {
         self.sk.clone()
     }
 
-    fn model(&self) -> String {
+    pub fn model(&self) -> String {
         self.model.clone()
     }
 }
@@ -105,6 +146,44 @@ impl SubModel {
 
     pub fn from_hashmap(hashmap: &types::HashMap) -> serde_dynamodb::error::Result<Self> {
         serde_dynamodb::from_hashmap(hashmap.to_owned())
+    }
+
+    pub fn to_hashmap(&self) -> serde_dynamodb::error::Result<types::HashMap> {
+        serde_dynamodb::to_hashmap(&self)
+    }
+
+    pub async fn get<DB, S>(db: &DB, parent: S, name: S) -> Result<Self, Box<dyn Error>>
+    where
+        DB: Database,
+        S: Into<String>,
+    {
+        let parent = parent.into();
+        let name = name.into();
+        let pk = format!("model#{}", parent);
+        let sk = format!("model#{}#submodel#{}", parent, name);
+
+        let res = db.get_item(pk, sk).await?;
+        if let Some(hashmap) = res.item {
+            return Ok(Self::from_hashmap(&hashmap)?);
+        }
+
+        Err(Box::new(ProgramError::GetNone(name)))
+    }
+
+    pub async fn save<DB>(&mut self, db: &DB) -> Result<(), Box<dyn Error>>
+    where
+        DB: Database,
+    {
+        let hashmap = self.to_hashmap()?;
+        let res = db
+            .transact_write_items(vec![
+                db.condition_check_exists(&self.parent, &self.parent, "model"),
+                db.put(hashmap),
+            ])
+            .await?;
+
+        println!("{:?}", res);
+        Ok(())
     }
 
     pub fn name(&self) -> String {

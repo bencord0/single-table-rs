@@ -2,7 +2,7 @@ use rstest::rstest;
 use std::error::Error;
 
 use single_table::*;
-use traits::Database;
+use traits::{Database, TransactionalDatabase};
 
 use super::dynamodb;
 
@@ -26,7 +26,7 @@ fn insert_models<DB: Database>(db: &DB) -> Result<(), Box<dyn Error>> {
 
 #[rstest(db, case::ddb(dynamodb()), case::mem(mem::memorydb()))]
 fn test_get_none<DB: Database>(db: DB) -> Result<(), Box<dyn Error>> {
-    let get_item_output = smol::run(db.get_item("model#foo", Some("model#foo")))?;
+    let get_item_output = smol::run(db.get_item("model#foo", "model#foo"))?;
 
     let item = get_item_output.item;
     assert_eq!(item, None);
@@ -44,7 +44,7 @@ fn test_put_get_some<DB: Database>(db: DB) -> Result<(), Box<dyn Error>> {
     let put_item_output = smol::run(db.put_item(hashmap))?;
     println!("{:?}", put_item_output);
 
-    let get_item_output = smol::run(db.get_item("model#foo", Some("model#foo")))?;
+    let get_item_output = smol::run(db.get_item("model#foo", "model#foo"))?;
     let item = get_item_output
         .item
         .unwrap_or_else(|| types::HashMap::new());
@@ -154,5 +154,21 @@ fn test_scan_limit<DB: Database>(db: DB) -> Result<(), Box<dyn Error>> {
     assert_eq!(items.scanned_count, Some(1));
 
     println!("{:#?}", items.items);
+    Ok(())
+}
+
+#[rstest(db, case::ddb(dynamodb()), case::mem(mem::memorydb()))]
+fn test_transact_write_items<DB: Database>(db: DB) -> Result<(), Box<dyn Error>> {
+    let mut foo: Model = Model::new("foo", 1);
+    let bar: SubModel = SubModel::new("bar", foo.clone());
+
+    let _ = smol::run(foo.save(&db))?;
+    let res = smol::run(db
+        .transact_write_items(vec![
+            db.condition_check_exists(foo.pk(), foo.sk(), foo.model()),
+            db.put(bar.to_hashmap()?),
+        ]))?;
+
+    println!("{:?}", res);
     Ok(())
 }

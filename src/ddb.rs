@@ -17,7 +17,7 @@ use rusoto_dynamodb::{
 };
 
 use crate::{
-    traits::{Database, Key},
+    traits::{Database, Key, make_key},
     types::*,
 };
 
@@ -140,28 +140,11 @@ impl Database for DDB {
             .await
     }
 
-    async fn get_item<S>(&self, pk: S, sk: Option<S>) -> GetItemResult
+    async fn get_item<S>(&self, pk: S, sk: S) -> GetItemResult
     where
         S: Into<String> + Send,
     {
-        let mut key = HashMap::new();
-        key.insert(
-            "pk".to_string(),
-            AttributeValue {
-                s: Some(pk.into()),
-                ..Default::default()
-            },
-        );
-        if let Some(sk) = sk {
-            key.insert(
-                "sk".to_string(),
-                AttributeValue {
-                    s: Some(sk.into()),
-                    ..Default::default()
-                },
-            );
-        }
-
+        let key = make_key(pk, sk);
         self.0
             .get_item(GetItemInput {
                 table_name: self.table_name(),
@@ -234,6 +217,18 @@ impl Database for DDB {
                 key_condition_expression,
                 expression_attribute_names,
                 expression_attribute_values,
+                ..Default::default()
+            })
+            .await
+    }
+
+    async fn transact_write_items(
+        &self,
+        transact_items: Vec<TransactWriteItem>,
+    ) -> TransactWriteItemsResult {
+        self.0
+            .transact_write_items(TransactWriteItemsInput {
+                transact_items,
                 ..Default::default()
             })
             .await

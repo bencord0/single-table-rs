@@ -15,10 +15,13 @@ For a written overview of the basic ideas, see [this article][1].
 
 `single-table` is a rust program that serves as a demonstration of the single-table pattern.
 
-This is not a library that you can use directly in another application, you will have to design
-application specific methods and traits for your own models that map to dynamodb requests.
+This is not a library that you can use directly in another application,
+ you will have to design application specific methods and traits for
+ your own models that map to dynamodb requests.
 
-If you need a tool for analytics, or require access patterns that cannot be planned a priori, then consider other datastores such as elasticsearch or a relational database.
+If you need a tool for analytics, or require access patterns
+that cannot be planned a priori, then consider other datastores
+such as elasticsearch or a relational database.
 
 ## Usage
 
@@ -39,14 +42,16 @@ OPTIONS:
         --table-name <table-name>                The DynamoDB Table Name (you only need one) [default: single-table]
 
 SUBCOMMANDS:
-    create      Create the DynamoDB Table using the predefined schema
-    describe    Discribe the DynamoDB Table schema
-    get         Get an Item by `pk` and optional `sk`
-    help        Prints this message or the help of the given subcommand(s)
-    put         Put Items into the DynamdoDB Table
-    query       Query for Items by `pk` and optional `sk`
-    scan        Scan for all items in the DynamoDB Table (or an index)
-    whoami      Return details about the current IAM user credentials. This is a demonstration of other rusoto APIs
+    create          Create the DynamoDB Table using the predefined schema
+    describe        Discribe the DynamoDB Table schema
+    get-model       Get a Model by `name`
+    get-submodel    Get a SubModel by `parent` Model and `name`
+    help            Prints this message or the help of the given subcommand(s)
+    put-model       Put a Model into the DynamdoDB Table
+    put-submodel    Put a SubModel into the DynamdoDB Table
+    query           Query for Items by `pk` and optional `sk`
+    scan            Scan for all items in the DynamoDB Table (or an index)
+    whoami          Return details about the current IAM user credentials. This is a demonstration of other rusoto APIs
 ```
 
 ### Start the database
@@ -57,12 +62,14 @@ If you have docker, start a copy of [`dynamodb-local`][2] with the provided scri
 $ ./scripts/start-ddb.sh
 ```
 
-This will launch the `amazon/dynamodb-local` docker container image, and expose a DynamoDB compatible 
-API service on port `2000`.
+This will launch the `amazon/dynamodb-local` docker container image, and expose a DynamoDB
+compatible API service on port `2000`.
 
-Depending on your own preference, you can also use [`localstack`][3], which exposes port `4566` by default.
+Depending on your own preference, you can also use [`localstack`][3], which exposes port
+`4566` by default.
 
-Either way, you can now set `AWS_ENDPOINT_URL` to an appropriate location. If running within AWS, leave this value unset to use the SDK default endpoint for the region.
+Either way, you can now set `AWS_ENDPOINT_URL` to an appropriate location. If running
+within AWS, leave this value unset to use the SDK default endpoint for the region.
 You can override the AWS region by setting `AWS_REGION`.
 
 ```bash
@@ -97,7 +104,7 @@ Check the Table has been created successfully with the `describe` command.
 
 ```bash
 $ cargo run -- describe --help
-single-table-describe 
+single-table-describe
 Discribe the DynamoDB Table schema
 
 USAGE:
@@ -115,55 +122,77 @@ $ cargo run -- describe
 ### Put Items into the Table
 
 ```bash
-$ cargo run -- put --help
-single-table-put 
-Put Items into the DynamdoDB Table
+single-table-put-model
+Put a Model into the DynamdoDB Table
 
 USAGE:
-    single-table put [OPTIONS]
+    single-table put-model <name> <a-version>
+
+ARGS:
+    <name>
+    <a-version>
 
 FLAGS:
     -h, --help       Prints help information
     -V, --version    Prints version information
-
-OPTIONS:
-        --models <models>...          
-        --submodels <submodels>...
 ```
 
 ```bash
-$ cargo run -- put --models foo:1 baz:2 --submodels bar:foo
+$ cargo run -- put-model foo 1
+$ cargo run -- put-model bar 2
+$ cargo run -- put-model baz 3
 ```
 
-You can put multiple items using this command. The specification string for each model will be specific to
-your application, perhaps it comes from a HTML form or REST API. For simplicity, this program uses `:`
-separated strings for attributes. Types are enforced by the Rust type system (`String` and `i64` in this 
-example), and the DynamoDB AttributeValues (JSON objects keyed by type).
+You can put "Model"s using this command. The specification string for each model will be specific to
+your application, perhaps it comes from a HTML form or REST API. Types are enforced by the Rust type
+system (`String` and `i64` in this example), and the DynamoDB AttributeValues (JSON objects keyed by type).
+
+```bash
+single-table-put-submodel
+Put a SubModel into the DynamdoDB Table
+
+USAGE:
+    single-table put-submodel <name> <parent>
+
+ARGS:
+    <name>
+    <parent>
+
+FLAGS:
+    -h, --help       Prints help information
+    -V, --version    Prints version information
+```
+
+```bash
+$ cargo run -- put-submodel abc foo
+```
+
+You can put "SubModel"s using this command. This is a demonstration of using Transactional Writes
+in DynamoDB. The `parent` argument must refer to the `name` of an existing `Model` which is enforced
+by the transaction write.
 
 ### Get Items
 
-Use the `get` command to retrieve a specific Item.
+Use the `get-model` and `get-submodel` commands to retrieve specific Items.
+
+#### get-model by PK
+
+In this example, only `Model`s can be retrieved if you only specify the `pk`.
 
 ```bash
-$ cargo run -- get --help
-single-table-get 
-Get an Item by `pk` and optional `sk`
+single-table-get-model
+Get a Model by `name`
 
 USAGE:
-    single-table get <pk> [sk]
+    single-table get-model <name>
 
 ARGS:
-    <pk>    
-    <sk>    
+    <name>
 
 FLAGS:
     -h, --help       Prints help information
     -V, --version    Prints version information
 ```
-
-#### by PK
-
-In this example, only `Model`s can be retrieved if you only specify the `pk`.
 
 ```bash
 $ cargo run -- get foo
@@ -174,7 +203,23 @@ Model {
 }
 ```
 
-#### by PK and SK
+#### get-submodel by PK and SK
+
+```bash
+single-table-get-submodel
+Get a SubModel by `parent` Model and `name`
+
+USAGE:
+    single-table get-submodel <parent> <name>
+
+ARGS:
+    <parent>
+    <name>
+
+FLAGS:
+    -h, --help       Prints help information
+    -V, --version    Prints version information
+```
 
 In this example, `SubModel`s can be retrieved if you specify both the `pk` and `sk`.
 
@@ -196,7 +241,7 @@ worse, full table `Scan`s.
 In this example, both `Model`s and `SubModel`s can be simultaneously retrieved for a specific `pk`.
 
 ```bash
-$ cargo run -- query foo   
+$ cargo run -- query foo
 Model {
     name: "foo",
     a_number: 1,
@@ -223,8 +268,8 @@ SubModel {
 ### Scan the whole table
 
 ```bash
-$ cargo run -- scan --help        
-single-table-scan 
+$ cargo run -- scan --help
+single-table-scan
 Scan for all items in the DynamoDB Table (or an index)
 
 USAGE:
@@ -235,7 +280,6 @@ FLAGS:
     -V, --version    Prints version information
 
 OPTIONS:
-        --index <index>    
+        --index <index>
         --limit <limit>
 ```
-

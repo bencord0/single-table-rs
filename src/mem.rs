@@ -86,17 +86,11 @@ impl Database for MemoryDB {
         })
     }
 
-    async fn get_item<S>(&self, pk: S, sk: Option<S>) -> GetItemResult
+    async fn get_item<S>(&self, pk: S, sk: S) -> GetItemResult
     where
         S: Into<String> + Send,
     {
-        let key = (
-            pk.into(),
-            match sk {
-                Some(s) => s.into(),
-                None => "".to_string(),
-            },
-        );
+        let key = (pk.into(), sk.into());
 
         let db = self.table.lock().await;
         let item = db.get(&key);
@@ -156,5 +150,12 @@ impl Database for MemoryDB {
             count: Some(count),
             ..Default::default()
         })
+    }
+
+    async fn transact_write_items(
+        &self,
+        _transact_items: Vec<TransactWriteItem>,
+    ) -> TransactWriteItemsResult {
+        Ok(Default::default())
     }
 }

@@ -2,7 +2,7 @@ use clap::Clap;
 use rusoto_dynamodb::DynamoDbClient;
 use rusoto_sts::StsClient;
 use single_table::{
-    args::{Commands, GetOpts, Opts, PutOpts, QueryOpts, ScanOpts},
+    args::*,
     ddb::DDB,
     env,
     sts::STS,
@@ -33,11 +33,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         match opts.commands {
             Commands::Create => create(db).await?,
             Commands::Describe => describe(db).await?,
+
+            Commands::GetModel(opts) => get_model(db, opts).await?,
+            Commands::GetSubModel(opts) => get_submodel(db, opts).await?,
+
+            Commands::Query(opts) => query(db, opts).await?,
             Commands::Scan(opts) => scan(db, opts).await?,
 
-            Commands::Put(opts) => put(db, opts).await?,
-            Commands::Get(opts) => get(db, opts).await?,
-            Commands::Query(opts) => query(db, opts).await?,
+            Commands::PutModel(opts) => put_model(db, opts).await?,
+            Commands::PutSubModel(opts) => put_submodel(db, opts).await?,
 
             Commands::WhoAmI => whoami(sts).await?,
         }
@@ -60,67 +64,16 @@ async fn describe(db: DDB) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-async fn scan(db: DDB, opts: ScanOpts) -> Result<(), Box<dyn Error>> {
-    let index = opts.index.clone();
-    let res = db.scan(opts.index, opts.limit).await?;
-
-    println!("TableName: {}", db.table_name());
-    if let Some(index) = index {
-        println!("IndexName: {}", index);
-    }
-
-    if let Some(hashmaps) = res.items {
-        for hashmap in hashmaps {
-            let _ = Model::from_hashmap(&hashmap)
-                .map(|item| println!("{:#?}", item));
-
-            let _ = SubModel::from_hashmap(&hashmap)
-                .map(|item| println!("{:#?}", item));
-        }
-    }
+async fn get_model(db: DDB, opts: GetModelOpts) -> Result<(), Box<dyn Error>> {
+    let res = Model::get(&db, opts.name).await?;
+    println!("{:#?}", res);
 
     Ok(())
 }
 
-async fn put(db: DDB, opts: PutOpts) -> Result<(), Box<dyn Error>> {
-    let mut hashmaps = vec![];
-
-    for opt in opts.models {
-        let model = Model::new(opt.name, opt.a_version);
-        let hashmap = serde_dynamodb::to_hashmap(&model)?;
-        hashmaps.push(hashmap);
-    }
-
-    for opt in opts.submodels {
-        let submodel = SubModel::new(opt.name, Model::new(opt.parent, 0));
-        let hashmap = serde_dynamodb::to_hashmap(&submodel)?;
-        hashmaps.push(hashmap);
-    }
-
-    for hashmap in hashmaps.iter().cloned() {
-        let res = db.put_item(hashmap).await?;
-        println!("{:#?}", res);
-    }
-    Ok(())
-}
-
-async fn get(db: DDB, opts: GetOpts) -> Result<(), Box<dyn Error>> {
-    let pk = format!("model#{}", opts.pk);
-    let sk = match opts.sk {
-        Some(sk) => format!("model#{}#submodel#{}", opts.pk, sk),
-        None => format!("model#{}", opts.pk),
-    };
-
-    let res = db.get_item(pk, Some(sk)).await?;
-    if let Some(hashmap) = res.item {
-        let _ = Model::from_hashmap(&hashmap)
-            .map(|item| println!("{:#?}", item));
-
-        let _ = SubModel::from_hashmap(&hashmap)
-            .map(|item| println!("{:#?}", item));
-    } else {
-        println!("{:?}", res);
-    }
+async fn get_submodel(db: DDB, opts: GetSubModelOpts) -> Result<(), Box<dyn Error>> {
+    let res = SubModel::get(&db, opts.parent, opts.name).await?;
+    println!("{:#?}", res);
 
     Ok(())
 }
@@ -152,6 +105,46 @@ async fn query(db: DDB, opts: QueryOpts) -> Result<(), Box<dyn Error>> {
             let _ = SubModel::from_hashmap(&hashmap).map(|item| println!("{:#?}", item));
         }
     }
+
+    Ok(())
+}
+
+async fn scan(db: DDB, opts: ScanOpts) -> Result<(), Box<dyn Error>> {
+    let index = opts.index.clone();
+    let res = db.scan(opts.index, opts.limit).await?;
+
+    println!("TableName: {}", db.table_name());
+    if let Some(index) = index {
+        println!("IndexName: {}", index);
+    }
+
+    if let Some(hashmaps) = res.items {
+        for hashmap in hashmaps {
+            let _ = Model::from_hashmap(&hashmap)
+                .map(|item| println!("{:#?}", item));
+
+            let _ = SubModel::from_hashmap(&hashmap)
+                .map(|item| println!("{:#?}", item));
+        }
+    }
+
+    Ok(())
+}
+
+async fn put_model(db: DDB, opts: PutModelOpts) -> Result<(), Box<dyn Error>> {
+    let mut model = Model::new(opts.name, opts.a_version);
+    let res = model.save(&db).await?;
+    println!("{:#?}", res);
+
+    Ok(())
+}
+
+async fn put_submodel(db: DDB, opts: PutSubModelOpts) -> Result<(), Box<dyn Error>> {
+    let parent = Model::get(&db, &opts.parent).await?;
+    let mut submodel = SubModel::new(opts.name, parent);
+
+    let res = submodel.save(&db).await?;
+    println!("{:#?}", res);
 
     Ok(())
 }

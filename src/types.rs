@@ -12,6 +12,9 @@ pub use rusoto_dynamodb::{
     GetItemError, GetItemInput, GetItemOutput,
     PutItemError, PutItemInput, PutItemOutput,
     QueryError, QueryInput, QueryOutput,
+
+    TransactWriteItemsError, TransactWriteItemsInput, TransactWriteItemsOutput, TransactWriteItem,
+    ConditionCheck, Put,
 };
 
 #[rustfmt::skip]
@@ -28,6 +31,8 @@ pub type ScanResult = Result<ScanOutput, RusotoError<ScanError>>;
 pub type GetItemResult = Result<GetItemOutput, RusotoError<GetItemError>>;
 pub type PutItemResult = Result<PutItemOutput, RusotoError<PutItemError>>;
 pub type QueryResult = Result<QueryOutput, RusotoError<QueryError>>;
+pub type TransactWriteItemsResult =
+    Result<TransactWriteItemsOutput, RusotoError<TransactWriteItemsError>>;
 
 // STS
 pub type GetCallerIdentityResult = Result<GetCallerIdentityResponse, RusotoError<GetCallerIdentityError>>;

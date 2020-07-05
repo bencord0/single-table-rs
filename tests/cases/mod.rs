@@ -52,7 +52,7 @@ impl<DB: Database + Send + Sync> Database for TemporaryDatabase<DB> {
         self.0.scan(index, limit).await
     }
 
-    async fn get_item<S: Into<String> + Send>(&self, pk: S, sk: Option<S>) -> types::GetItemResult {
+    async fn get_item<S: Into<String> + Send>(&self, pk: S, sk: S) -> types::GetItemResult {
         self.0.get_item(pk, sk).await
     }
 
@@ -70,6 +70,13 @@ impl<DB: Database + Send + Sync> Database for TemporaryDatabase<DB> {
         sk: S,
     ) -> types::QueryResult {
         self.0.query(index, pk, sk).await
+    }
+
+    async fn transact_write_items(
+        &self,
+        transact_items: Vec<types::TransactWriteItem>,
+    ) -> types::TransactWriteItemsResult {
+        self.0.transact_write_items(transact_items).await
     }
 }
 

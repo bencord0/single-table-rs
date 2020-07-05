@@ -1,8 +1,4 @@
 use clap::Clap;
-use std::{
-    error::Error,
-    str::FromStr,
-};
 
 #[derive(Clap, Debug)]
 #[clap(version, author)]
@@ -30,10 +26,17 @@ pub enum Commands {
     /// Scan for all items in the DynamoDB Table (or an index).
     Scan(ScanOpts),
 
-    /// Put Items into the DynamdoDB Table.
-    Put(PutOpts),
-    /// Get an Item by `pk` and optional `sk`.
-    Get(GetOpts),
+    /// Put a Model into the DynamdoDB Table.
+    PutModel(PutModelOpts),
+    /// Put a SubModel into the DynamdoDB Table.
+    #[clap(name = "put-submodel")]
+    PutSubModel(PutSubModelOpts),
+
+    /// Get a Model by `name`.
+    GetModel(GetModelOpts),
+    /// Get a SubModel by `parent` Model and `name`.
+    #[clap(name = "get-submodel")]
+    GetSubModel(GetSubModelOpts),
     /// Query for Items by `pk` and optional `sk`.
     Query(QueryOpts),
 
@@ -53,18 +56,14 @@ pub struct ScanOpts {
 }
 
 #[derive(Clap, Debug)]
-pub struct GetOpts {
-    pub pk: String,
-    pub sk: Option<String>,
+pub struct GetModelOpts {
+    pub name: String,
 }
 
 #[derive(Clap, Debug)]
-pub struct PutOpts {
-    #[clap(long)]
-    pub models: Vec<ModelOpts>,
-
-    #[clap(long)]
-    pub submodels: Vec<SubmodelOpts>,
+pub struct GetSubModelOpts {
+    pub parent: String,
+    pub name: String,
 }
 
 #[derive(Clap, Debug)]
@@ -77,41 +76,13 @@ pub struct QueryOpts {
 }
 
 #[derive(Clap, Debug)]
-pub struct ModelOpts {
+pub struct PutModelOpts {
     pub name: String,
     pub a_version: i32,
 }
 
-impl FromStr for ModelOpts {
-    type Err = Box<dyn Error>;
-    fn from_str(s: &str) -> Result<ModelOpts, Self::Err> {
-        let pos = s
-            .find(':')
-            .ok_or_else(|| format!("invalid input, expected 'String:i32'; no ':' found in '{}'", s))?;
-
-        Ok(ModelOpts {
-            name: s[..pos].parse()?,
-            a_version: s[pos + 1..].parse()?,
-        })
-    }
-}
-
 #[derive(Clap, Debug)]
-pub struct SubmodelOpts {
+pub struct PutSubModelOpts {
     pub name: String,
     pub parent: String,
-}
-
-impl FromStr for SubmodelOpts {
-    type Err = Box<dyn Error>;
-    fn from_str(s: &str) -> Result<SubmodelOpts, Self::Err> {
-        let pos = s
-            .find(':')
-            .ok_or_else(|| format!("invalid input, expected 'String:String; no ':' found in '{}'", s))?;
-
-        Ok(SubmodelOpts {
-            name: s[..pos].parse()?,
-            parent: s[pos + 1..].parse()?,
-        })
-    }
 }

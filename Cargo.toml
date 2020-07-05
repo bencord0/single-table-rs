@@ -17,6 +17,7 @@ rusoto_sts = "0.44.0"
 serde = "1.0.111"
 smol = { version = "0.1.11", features = ["tokio02"] }
 smol-timeout = "0.1.0"
+thiserror = "1.0.20"
 uuid = { version = "0.8.1", features = ["v4"] }
 
 # https://github.com/mockersf/serde_dynamodb/pull/138
