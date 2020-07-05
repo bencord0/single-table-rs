@@ -1,20 +1,8 @@
 use clap::Clap;
 use rusoto_dynamodb::DynamoDbClient;
 use rusoto_sts::StsClient;
-use single_table::{
-    args::*,
-    ddb::DDB,
-    env,
-    sts::STS,
-    traits::{
-        Database,
-        SecurityTokens,
-    },
-    Model, SubModel,
-};
-use std::{
-    error::Error,
-};
+use single_table::{args::*, env, Database, Model, SecurityTokens, SubModel};
+use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let opts = Opts::parse();
@@ -23,11 +11,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let region = env::resolve_region(opts.aws_region.clone(), opts.aws_endpoint_url.clone())?;
     println!("{:?}", region);
 
-    let db = DDB::new(
-        DynamoDbClient::new(region.clone()),
-        &opts.table_name,
-    );
-    let sts = STS::new(StsClient::new(region.clone()));
+    let db = single_table::DDB::new(DynamoDbClient::new(region.clone()), &opts.table_name);
+    let sts = single_table::STS::new(StsClient::new(region.clone()));
 
     smol::run(async {
         match opts.commands {
@@ -49,7 +34,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     })
 }
 
-async fn create(db: DDB) -> Result<(), Box<dyn Error>> {
+async fn create<DB: Database>(db: DB) -> Result<(), Box<dyn Error>> {
     println!("table name: {}", db.table_name());
     let res = db.create_table().await;
 
@@ -57,28 +42,28 @@ async fn create(db: DDB) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-async fn describe(db: DDB) -> Result<(), Box<dyn Error>> {
+async fn describe<DB: Database>(db: DB) -> Result<(), Box<dyn Error>> {
     let res = db.describe_table().await;
 
     println!("{}: {:#?}", db.table_name(), res);
     Ok(())
 }
 
-async fn get_model(db: DDB, opts: GetModelOpts) -> Result<(), Box<dyn Error>> {
+async fn get_model<DB: Database>(db: DB, opts: GetModelOpts) -> Result<(), Box<dyn Error>> {
     let res = Model::get(&db, opts.name).await?;
     println!("{:#?}", res);
 
     Ok(())
 }
 
-async fn get_submodel(db: DDB, opts: GetSubModelOpts) -> Result<(), Box<dyn Error>> {
+async fn get_submodel<DB: Database>(db: DB, opts: GetSubModelOpts) -> Result<(), Box<dyn Error>> {
     let res = SubModel::get(&db, opts.parent, opts.name).await?;
     println!("{:#?}", res);
 
     Ok(())
 }
 
-async fn query(db: DDB, opts: QueryOpts) -> Result<(), Box<dyn Error>> {
+async fn query<DB: Database>(db: DB, opts: QueryOpts) -> Result<(), Box<dyn Error>> {
     let (pk, sk) = match &opts.index {
         Some(index) if index == "model" => match opts.sk {
             Some(sk) => (
@@ -109,7 +94,7 @@ async fn query(db: DDB, opts: QueryOpts) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-async fn scan(db: DDB, opts: ScanOpts) -> Result<(), Box<dyn Error>> {
+async fn scan<DB: Database>(db: DB, opts: ScanOpts) -> Result<(), Box<dyn Error>> {
     let index = opts.index.clone();
     let res = db.scan(opts.index, opts.limit).await?;
 
@@ -120,18 +105,16 @@ async fn scan(db: DDB, opts: ScanOpts) -> Result<(), Box<dyn Error>> {
 
     if let Some(hashmaps) = res.items {
         for hashmap in hashmaps {
-            let _ = Model::from_hashmap(&hashmap)
-                .map(|item| println!("{:#?}", item));
+            let _ = Model::from_hashmap(&hashmap).map(|item| println!("{:#?}", item));
 
-            let _ = SubModel::from_hashmap(&hashmap)
-                .map(|item| println!("{:#?}", item));
+            let _ = SubModel::from_hashmap(&hashmap).map(|item| println!("{:#?}", item));
         }
     }
 
     Ok(())
 }
 
-async fn put_model(db: DDB, opts: PutModelOpts) -> Result<(), Box<dyn Error>> {
+async fn put_model<DB: Database>(db: DB, opts: PutModelOpts) -> Result<(), Box<dyn Error>> {
     let mut model = Model::new(opts.name, opts.a_version);
     let res = model.save(&db).await?;
     println!("{:#?}", res);
@@ -139,7 +122,7 @@ async fn put_model(db: DDB, opts: PutModelOpts) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-async fn put_submodel(db: DDB, opts: PutSubModelOpts) -> Result<(), Box<dyn Error>> {
+async fn put_submodel<DB: Database>(db: DB, opts: PutSubModelOpts) -> Result<(), Box<dyn Error>> {
     let parent = Model::get(&db, &opts.parent).await?;
     let mut submodel = SubModel::new(opts.name, parent);
 
@@ -149,7 +132,7 @@ async fn put_submodel(db: DDB, opts: PutSubModelOpts) -> Result<(), Box<dyn Erro
     Ok(())
 }
 
-async fn whoami(sts: STS) -> Result<(), Box<dyn Error>> {
+async fn whoami<STS: SecurityTokens>(sts: STS) -> Result<(), Box<dyn Error>> {
     let caller_id = sts.get_caller_identity().await?;
     println!("{:?}", caller_id);
     Ok(())

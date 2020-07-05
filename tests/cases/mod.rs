@@ -1,5 +1,7 @@
 use async_trait::async_trait;
 use rusoto_dynamodb::DynamoDbClient;
+use smol_timeout::TimeoutExt;
+use std::time::Duration;
 
 use single_table::*;
 use traits::{Database, Key};
@@ -11,26 +13,48 @@ fn dynamodb() -> TemporaryDatabase<ddb::DDB> {
     // There's a script in `/scripts/start-ddb.sh` to set one up with docker
     let endpoint_url = env::ensure_var("AWS_ENDPOINT_URL");
     let region = env::resolve_region(None, Some(endpoint_url)).unwrap();
-    let db = ddb::DDB::new(
-        DynamoDbClient::new(region),
-        {
-            let uuid = uuid::Uuid::new_v4();
-            format!("single-table-{}", uuid.to_hyphenated())
-        }
-    );
+    let db = ddb::DDB::new(DynamoDbClient::new(region), {
+        let uuid = uuid::Uuid::new_v4();
+        format!("single-table-{}", uuid.to_hyphenated())
+    });
 
     // Create a temporary database table that will be deleted on Drop
-    db.sync_create_table();
-    TemporaryDatabase(db)
+    {
+        let db = TemporaryDatabase(db);
+        db.sync_create_table();
+        db
+    }
 }
 
 struct TemporaryDatabase<DB: Database + Send + Sync>(DB);
 
+impl<DB: Database + Send + Sync> TemporaryDatabase<DB> {
+    fn sync_create_table(&self) {
+        if let None = smol::run(async { self.create_table().timeout(Duration::from_secs(1)).await })
+        {
+            panic!("sync_create_table: timed out");
+        };
+    }
+
+    fn sync_delete_table(&self) {
+        if let None = smol::run(async { self.delete_table().timeout(Duration::from_secs(1)).await })
+        {
+            panic!("sync_delete_table: timed out");
+        };
+    }
+}
+
+impl<DB: Database + Send + Sync> Drop for TemporaryDatabase<DB> {
+    fn drop(&mut self) {
+        self.sync_delete_table();
+    }
+}
+
 #[async_trait]
 impl<DB: Database + Send + Sync> Database for TemporaryDatabase<DB> {
-    fn table_name(&self) -> String { self.0.table_name() }
-    fn sync_create_table(&self) { self.0.sync_create_table() }
-    fn sync_delete_table(&self) { self.0.sync_delete_table() }
+    fn table_name(&self) -> String {
+        self.0.table_name()
+    }
 
     async fn create_table(&self) -> types::CreateTableResult {
         self.0.create_table().await
@@ -77,11 +101,5 @@ impl<DB: Database + Send + Sync> Database for TemporaryDatabase<DB> {
         transact_items: Vec<types::TransactWriteItem>,
     ) -> types::TransactWriteItemsResult {
         self.0.transact_write_items(transact_items).await
-    }
-}
-
-impl<DB: Database + Send + Sync> Drop for TemporaryDatabase<DB> {
-    fn drop(&mut self) {
-        self.0.sync_delete_table();
     }
 }

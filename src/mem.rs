@@ -37,16 +37,8 @@ impl Database for MemoryDB {
         Ok(Default::default())
     }
 
-    fn sync_delete_table(&self) {
-        let _ = smol::run(async { self.delete_table().await });
-    }
-
     async fn create_table(&self) -> CreateTableResult {
         Ok(Default::default())
-    }
-
-    fn sync_create_table(&self) {
-        let _ = smol::run(async { self.create_table().await });
     }
 
     async fn describe_table(&self) -> DescribeTableResult {

@@ -11,7 +11,9 @@ pub mod sts;
 pub mod traits;
 pub mod types;
 
-use traits::Database;
+pub use ddb::DDB;
+pub use sts::STS;
+pub use traits::{Database, SecurityTokens};
 
 #[derive(thiserror::Error, Debug)]
 enum ProgramError {

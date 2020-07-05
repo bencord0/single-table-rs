@@ -5,9 +5,6 @@ use async_trait::async_trait;
 pub trait Database: TransactionalOperations {
     fn table_name(&self) -> String;
 
-    fn sync_create_table(&self);
-    fn sync_delete_table(&self);
-
     async fn create_table(&self) -> types::CreateTableResult;
     async fn delete_table(&self) -> types::DeleteTableResult;
     async fn describe_table(&self) -> types::DescribeTableResult;

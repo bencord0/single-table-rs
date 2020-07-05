@@ -1,6 +1,4 @@
 use async_trait::async_trait;
-use smol_timeout::TimeoutExt;
-use std::time::Duration;
 
 #[rustfmt::skip]
 use rusoto_dynamodb::{
@@ -17,7 +15,7 @@ use rusoto_dynamodb::{
 };
 
 use crate::{
-    traits::{Database, Key, make_key},
+    traits::{make_key, Database, Key},
     types::*,
 };
 
@@ -42,13 +40,6 @@ impl Database for DDB {
                 ..Default::default()
             })
             .await
-    }
-
-    fn sync_delete_table(&self) {
-        if let None = smol::run(async { self.delete_table().timeout(Duration::from_secs(1)).await })
-        {
-            panic!("sync_delete_table: timed out");
-        };
     }
 
     async fn create_table(&self) -> CreateTableResult {
@@ -107,13 +98,6 @@ impl Database for DDB {
                 ..Default::default()
             })
             .await
-    }
-
-    fn sync_create_table(&self) {
-        if let None = smol::run(async { self.create_table().timeout(Duration::from_secs(1)).await })
-        {
-            panic!("sync_create_table: timed out");
-        };
     }
 
     async fn describe_table(&self) -> DescribeTableResult {
