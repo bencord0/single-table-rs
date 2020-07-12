@@ -1,4 +1,6 @@
+use async_std::task::sleep;
 use async_trait::async_trait;
+use futures_intrusive::sync::Semaphore;
 use rusoto_dynamodb::DynamoDbClient;
 use smol_timeout::TimeoutExt;
 use std::time::Duration;
@@ -20,17 +22,23 @@ fn dynamodb() -> TemporaryDatabase<ddb::DDB> {
 
     // Create a temporary database table that will be deleted on Drop
     {
-        let db = TemporaryDatabase(db);
+        let db = TemporaryDatabase::new(db);
         db.sync_create_table();
         db
     }
 }
 
-struct TemporaryDatabase<DB: Database + Send + Sync>(DB);
+struct TemporaryDatabase<DB: Database + Send + Sync>(DB, Semaphore);
 
 impl<DB: Database + Send + Sync> TemporaryDatabase<DB> {
+    fn new(db: DB) -> Self {
+        // Create an async aware semaphore to allow some parallel access to the db
+        let semaphore = Semaphore::new(true, 5);
+        Self(db, semaphore)
+    }
+
     fn sync_create_table(&self) {
-        if let None = smol::run(async { self.create_table().timeout(Duration::from_secs(1)).await })
+        if let None = smol::run(async { self.create_table().timeout(Duration::from_secs(2)).await })
         {
             panic!("sync_create_table: timed out");
         };
@@ -57,14 +65,23 @@ impl<DB: Database + Send + Sync> Database for TemporaryDatabase<DB> {
     }
 
     async fn create_table(&self) -> types::CreateTableResult {
-        self.0.create_table().await
+        // create_table using dynamodb local can fail with a 500 error
+        // panicked at 'create_table: Unknown(BufferedHttpResponse {status: 500, ... }
+        //
+        // Use a semaphore to require exclusive access and a small gap between requests
+        // to protect the db when creating tables.
+        let _sem = self.1.acquire(5).await;
+        sleep(Duration::from_millis(200)).await;
+        Ok(self.0.create_table().await.expect("create_table"))
     }
 
     async fn delete_table(&self) -> types::DeleteTableResult {
+        let _sem = self.1.acquire(1).await;
         self.0.delete_table().await
     }
 
     async fn describe_table(&self) -> types::DescribeTableResult {
+        let _sem = self.1.acquire(1).await;
         self.0.describe_table().await
     }
 
@@ -73,10 +90,12 @@ impl<DB: Database + Send + Sync> Database for TemporaryDatabase<DB> {
         index: Option<S>,
         limit: Option<i64>,
     ) -> types::ScanResult {
+        let _sem = self.1.acquire(1).await;
         self.0.scan(index, limit).await
     }
 
     async fn get_item<S: Into<String> + Send>(&self, pk: S, sk: S) -> types::GetItemResult {
+        let _sem = self.1.acquire(1).await;
         self.0.get_item(pk, sk).await
     }
 
@@ -84,6 +103,7 @@ impl<DB: Database + Send + Sync> Database for TemporaryDatabase<DB> {
         &self,
         hashmap: H,
     ) -> types::PutItemResult {
+        let _sem = self.1.acquire(1).await;
         self.0.put_item(hashmap).await
     }
 
@@ -93,6 +113,7 @@ impl<DB: Database + Send + Sync> Database for TemporaryDatabase<DB> {
         pk: S,
         sk: S,
     ) -> types::QueryResult {
+        let _sem = self.1.acquire(1).await;
         self.0.query(index, pk, sk).await
     }
 
@@ -100,6 +121,7 @@ impl<DB: Database + Send + Sync> Database for TemporaryDatabase<DB> {
         &self,
         transact_items: Vec<types::TransactWriteItem>,
     ) -> types::TransactWriteItemsResult {
+        let _sem = self.1.acquire(1).await;
         self.0.transact_write_items(transact_items).await
     }
 }

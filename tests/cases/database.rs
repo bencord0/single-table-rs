@@ -159,6 +159,9 @@ fn test_scan_limit<DB: Database>(db: DB) -> Result<(), Box<dyn Error>> {
 
 #[rstest(db, case::ddb(dynamodb()), case::mem(mem::memorydb()))]
 fn test_transact_write_items<DB: Database>(db: DB) -> Result<(), Box<dyn Error>> {
+    let table_name = smol::run(db.describe_table())?;
+    assert!(table_name.table.is_some());
+
     let mut foo: Model = Model::new("foo", 1);
     let bar: SubModel = SubModel::new("bar", foo.clone());
 

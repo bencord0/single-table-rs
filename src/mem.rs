@@ -42,7 +42,15 @@ impl Database for MemoryDB {
     }
 
     async fn describe_table(&self) -> DescribeTableResult {
-        Ok(Default::default())
+        let output = DescribeTableOutput {
+            table: Some(TableDescription {
+                table_name: Some(self.table_name()),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        Ok(output)
     }
 
     async fn scan<S>(&self, index: Option<S>, limit: Option<i64>) -> ScanResult

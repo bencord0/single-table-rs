@@ -4,6 +4,7 @@ use std::collections;
 #[rustfmt::skip]
 pub use rusoto_dynamodb::{
     AttributeValue,
+    TableDescription,
 
     CreateTableError, CreateTableInput, CreateTableOutput,
     DeleteTableError, DeleteTableInput, DeleteTableOutput,

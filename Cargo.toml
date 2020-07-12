@@ -22,6 +22,8 @@ uuid = { version = "0.8.1", features = ["v4"] }
 serde_dynamodb = { git = "https://github.com/mockersf/serde_dynamodb", rev = "c352024c0ae25f32f03494585449aa3c4a0b27b4" }
 
 [dev-dependencies]
+async-std = "1.6.2"
 futures = "0.3.5"
+futures-intrusive = "0.3.1"
 rstest = "0.6.4"
 smol-timeout = "0.1.0"
