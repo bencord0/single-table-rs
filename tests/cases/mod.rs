@@ -70,9 +70,23 @@ impl<DB: Database + Send + Sync> Database for TemporaryDatabase<DB> {
         //
         // Use a semaphore to require exclusive access and a small gap between requests
         // to protect the db when creating tables.
-        let _sem = self.1.acquire(5).await;
-        sleep(Duration::from_millis(200)).await;
-        Ok(self.0.create_table().await.expect("create_table"))
+        match {
+            // lightweight acquire, drop at end of block
+            let _sem = self.1.acquire(1).await;
+            self.0.create_table().await
+        } {
+            // Successfully created the table on first try
+            Ok(table_result) => Ok(table_result),
+
+            // Failed to create the table.
+            // Acquire the full semaphore and wait for the db to settle
+            Err(_) => {
+                let _sem = self.1.acquire(5).await;
+                sleep(Duration::from_millis(500)).await;
+
+                Ok(self.0.create_table().await.expect("create_table"))
+            }
+        }
     }
 
     async fn delete_table(&self) -> types::DeleteTableResult {
