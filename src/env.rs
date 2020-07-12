@@ -1,7 +1,10 @@
 use rusoto_core::Region;
 use std::{env, ffi::OsStr, str::FromStr};
 
-pub fn set_default_var<K: AsRef<OsStr>, V: AsRef<OsStr>>(key: K, val: V) -> Result<String, env::VarError> {
+pub fn set_default_var<K: AsRef<OsStr>, V: AsRef<OsStr>>(
+    key: K,
+    val: V,
+) -> Result<String, env::VarError> {
     let key = key.as_ref();
     match env::var(key.clone()) {
         Ok(s) => Ok(s),
@@ -11,24 +14,29 @@ pub fn set_default_var<K: AsRef<OsStr>, V: AsRef<OsStr>>(key: K, val: V) -> Resu
             let v = val.as_ref();
             match v.to_str() {
                 Some(s) => Ok(s.to_string()),
-                None => Err(env::VarError::NotUnicode(v.to_os_string()))
+                None => Err(env::VarError::NotUnicode(v.to_os_string())),
             }
-        },
+        }
         Err(e) => Err(e),
     }
 }
 
 // Retrieve environment variable, or panic
 pub fn ensure_var<K: AsRef<OsStr>>(key: K) -> String {
-    env::var(key.as_ref()).expect(r#"
+    env::var(key.as_ref()).expect(
+        r#"
 
 Set AWS_ENDPOINT_URL to run tests.
     example: `export AWS_ENDPOINT_URL=http://localhost:2000`
 
-"#)
+"#,
+    )
 }
 
-pub fn resolve_region(aws_region: Option<String>, aws_endpoint_url: Option<String>) -> Result<Region, Box<dyn std::error::Error>> {
+pub fn resolve_region(
+    aws_region: Option<String>,
+    aws_endpoint_url: Option<String>,
+) -> Result<Region, Box<dyn std::error::Error>> {
     let region: Region = match (aws_region.as_ref(), aws_endpoint_url.as_ref()) {
         // User fully specified Region details
         (Some(region), Some(endpoint)) => Region::Custom {
@@ -48,7 +56,7 @@ pub fn resolve_region(aws_region: Option<String>, aws_endpoint_url: Option<Strin
                 name: "local".to_string(),
                 endpoint: endpoint.to_string(),
             }
-        },
+        }
 
         // User did not specify connection details, use the SDK defaults
         (None, None) => Region::default(),

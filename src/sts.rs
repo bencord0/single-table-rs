@@ -6,10 +6,7 @@ use rusoto_sts::{
     StsClient,
 };
 
-use crate::{
-    types::*,
-    traits::SecurityTokens,
-};
+use crate::{traits::SecurityTokens, types::*};
 
 pub struct STS(StsClient);
 
@@ -22,8 +19,10 @@ impl STS {
 #[async_trait]
 impl SecurityTokens for STS {
     async fn get_caller_identity(&self) -> GetCallerIdentityResult {
-        self.0.get_caller_identity(GetCallerIdentityRequest{
-            ..Default::default()
-        }).await
+        self.0
+            .get_caller_identity(GetCallerIdentityRequest {
+                ..Default::default()
+            })
+            .await
     }
 }

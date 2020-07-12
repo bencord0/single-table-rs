@@ -33,7 +33,12 @@ pub trait Database: TransactionalOperations {
 }
 
 pub trait TransactionalOperations {
-    fn condition_check_exists<PK, SK, M>(&self, pk: PK, sk: SK, model: M) -> types::TransactWriteItem
+    fn condition_check_exists<PK, SK, M>(
+        &self,
+        pk: PK,
+        sk: SK,
+        model: M,
+    ) -> types::TransactWriteItem
     where
         PK: Into<String> + Send,
         SK: Into<String> + Send,
@@ -43,7 +48,12 @@ pub trait TransactionalOperations {
 }
 
 impl<T: Database> TransactionalOperations for T {
-    fn condition_check_exists<PK, SK, M>(&self, pk: PK, sk: SK, model: M) -> types::TransactWriteItem
+    fn condition_check_exists<PK, SK, M>(
+        &self,
+        pk: PK,
+        sk: SK,
+        model: M,
+    ) -> types::TransactWriteItem
     where
         PK: Into<String> + Send,
         SK: Into<String> + Send,

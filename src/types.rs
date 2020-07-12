@@ -35,4 +35,5 @@ pub type TransactWriteItemsResult =
     Result<TransactWriteItemsOutput, RusotoError<TransactWriteItemsError>>;
 
 // STS
-pub type GetCallerIdentityResult = Result<GetCallerIdentityResponse, RusotoError<GetCallerIdentityError>>;
+pub type GetCallerIdentityResult =
+    Result<GetCallerIdentityResponse, RusotoError<GetCallerIdentityError>>;
