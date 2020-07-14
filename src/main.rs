@@ -34,7 +34,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     })
 }
 
-async fn create<DB: Database>(db: DB) -> Result<(), Box<dyn Error>> {
+async fn create(db: impl Database) -> Result<(), Box<dyn Error>> {
     println!("table name: {}", db.table_name());
     let res = db.create_table().await;
 
@@ -42,28 +42,28 @@ async fn create<DB: Database>(db: DB) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-async fn describe<DB: Database>(db: DB) -> Result<(), Box<dyn Error>> {
+async fn describe(db: impl Database) -> Result<(), Box<dyn Error>> {
     let res = db.describe_table().await;
 
     println!("{}: {:#?}", db.table_name(), res);
     Ok(())
 }
 
-async fn get_model<DB: Database>(db: DB, opts: GetModelOpts) -> Result<(), Box<dyn Error>> {
+async fn get_model(db: impl Database, opts: GetModelOpts) -> Result<(), Box<dyn Error>> {
     let res = Model::get(&db, opts.name).await?;
     println!("{:#?}", res);
 
     Ok(())
 }
 
-async fn get_submodel<DB: Database>(db: DB, opts: GetSubModelOpts) -> Result<(), Box<dyn Error>> {
+async fn get_submodel(db: impl Database, opts: GetSubModelOpts) -> Result<(), Box<dyn Error>> {
     let res = SubModel::get(&db, opts.parent, opts.name).await?;
     println!("{:#?}", res);
 
     Ok(())
 }
 
-async fn query<DB: Database>(db: DB, opts: QueryOpts) -> Result<(), Box<dyn Error>> {
+async fn query(db: impl Database, opts: QueryOpts) -> Result<(), Box<dyn Error>> {
     let (pk, sk) = match &opts.index {
         Some(index) if index == "model" => match opts.sk {
             Some(sk) => (
@@ -94,7 +94,7 @@ async fn query<DB: Database>(db: DB, opts: QueryOpts) -> Result<(), Box<dyn Erro
     Ok(())
 }
 
-async fn scan<DB: Database>(db: DB, opts: ScanOpts) -> Result<(), Box<dyn Error>> {
+async fn scan(db: impl Database, opts: ScanOpts) -> Result<(), Box<dyn Error>> {
     let index = opts.index.clone();
     let res = db.scan(opts.index, opts.limit).await?;
 
@@ -114,7 +114,7 @@ async fn scan<DB: Database>(db: DB, opts: ScanOpts) -> Result<(), Box<dyn Error>
     Ok(())
 }
 
-async fn put_model<DB: Database>(db: DB, opts: PutModelOpts) -> Result<(), Box<dyn Error>> {
+async fn put_model(db: impl Database, opts: PutModelOpts) -> Result<(), Box<dyn Error>> {
     let mut model = Model::new(opts.name, opts.a_version);
     let res = model.save(&db).await?;
     println!("{:#?}", res);
@@ -122,7 +122,7 @@ async fn put_model<DB: Database>(db: DB, opts: PutModelOpts) -> Result<(), Box<d
     Ok(())
 }
 
-async fn put_submodel<DB: Database>(db: DB, opts: PutSubModelOpts) -> Result<(), Box<dyn Error>> {
+async fn put_submodel(db: impl Database, opts: PutSubModelOpts) -> Result<(), Box<dyn Error>> {
     let parent = Model::get(&db, &opts.parent).await?;
     let mut submodel = SubModel::new(opts.name, parent);
 

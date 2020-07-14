@@ -59,9 +59,8 @@ impl Model {
         serde_dynamodb::to_hashmap(&self)
     }
 
-    pub async fn get<DB, S>(db: &DB, name: S) -> Result<Self, Box<dyn Error>>
+    pub async fn get<S>(db: &impl Database, name: S) -> Result<Self, Box<dyn Error>>
     where
-        DB: Database,
         S: Into<String>,
     {
         let name = name.into();
@@ -76,9 +75,7 @@ impl Model {
         Err(Box::new(ProgramError::GetNone(name)))
     }
 
-    pub async fn save<DB>(&mut self, db: &DB) -> Result<(), Box<dyn Error>>
-    where
-        DB: Database,
+    pub async fn save(&mut self, db: &impl Database) -> Result<(), Box<dyn Error>>
     {
         let hashmap = self.to_hashmap()?;
         let _ = db.put_item(hashmap).await?;
@@ -154,9 +151,8 @@ impl SubModel {
         serde_dynamodb::to_hashmap(&self)
     }
 
-    pub async fn get<DB, S>(db: &DB, parent: S, name: S) -> Result<Self, Box<dyn Error>>
+    pub async fn get<S>(db: &impl Database, parent: S, name: S) -> Result<Self, Box<dyn Error>>
     where
-        DB: Database,
         S: Into<String>,
     {
         let parent = parent.into();
@@ -172,10 +168,7 @@ impl SubModel {
         Err(Box::new(ProgramError::GetNone(name)))
     }
 
-    pub async fn save<DB>(&mut self, db: &DB) -> Result<(), Box<dyn Error>>
-    where
-        DB: Database,
-    {
+    pub async fn save(&mut self, db: &impl Database) -> Result<(), Box<dyn Error>> {
         let hashmap = self.to_hashmap()?;
         let res = db
             .transact_write_items(vec![
