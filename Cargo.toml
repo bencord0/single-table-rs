@@ -28,3 +28,7 @@ futures-intrusive = "0.3.1"
 rstest = "0.6.4"
 rstest_reuse = "0.1.0"
 smol-timeout = "0.1.0"
+
+[features]
+# Enable to test with an external database such as dynamodb-local
+external_database = []

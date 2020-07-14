@@ -1,36 +1,21 @@
 use rstest::rstest;
 use rstest_reuse::*;
-use std::error::Error;
 
 use single_table::*;
 use traits::Database;
 
-use super::dynamodb;
-
-fn insert_models(db: &impl Database) -> Result<(), Box<dyn Error>> {
-    let foo: Model = Model::new("foo", 1);
-    let bar: SubModel = SubModel::new("bar", foo.clone());
-    let baz: SubModel = SubModel::new("baz", foo.clone());
-
-    let items: Vec<types::HashMap> = vec![
-        serde_dynamodb::to_hashmap(&foo)?,
-        serde_dynamodb::to_hashmap(&bar)?,
-        serde_dynamodb::to_hashmap(&baz)?,
-    ];
-
-    smol::run(futures::future::join_all(
-        items.iter().map(|item| db.put_item(item.clone())),
-    ));
-
-    Ok(())
-}
+use super::*;
 
 #[template]
-#[rstest(db, case::ddb(dynamodb()), case::mem(mem::memorydb()))]
+#[rstest(db,
+    #[cfg(feature = "external_database")]
+    case::ddb(dynamodb()),
+    case::mem(memorydb()),
+)]
 fn database(db: impl Database) {}
 
 #[apply(database)]
-fn test_get_none(db: impl Database) -> Result<(), Box<dyn Error>> {
+fn test_get_none(db: impl Database) -> TestResult {
     let get_item_output = smol::run(db.get_item("model#foo", "model#foo"))?;
 
     let item = get_item_output.item;
@@ -40,7 +25,7 @@ fn test_get_none(db: impl Database) -> Result<(), Box<dyn Error>> {
 }
 
 #[apply(database)]
-fn test_put_get_some(db: impl Database) -> Result<(), Box<dyn Error>> {
+fn test_put_get_some(db: impl Database) -> TestResult {
     let model = Model::new("foo", 1);
 
     let hashmap: types::HashMap =
@@ -63,7 +48,7 @@ fn test_put_get_some(db: impl Database) -> Result<(), Box<dyn Error>> {
 }
 
 #[apply(database)]
-fn test_query_submodels(db: impl Database) -> Result<(), Box<dyn Error>> {
+fn test_query_submodels(db: impl Database) -> TestResult {
     insert_models(&db)?;
 
     let items: rusoto_dynamodb::QueryOutput =
@@ -85,7 +70,7 @@ fn test_query_submodels(db: impl Database) -> Result<(), Box<dyn Error>> {
 }
 
 #[apply(database)]
-fn test_query_index_model(db: impl Database) -> Result<(), Box<dyn Error>> {
+fn test_query_index_model(db: impl Database) -> TestResult {
     insert_models(&db)?;
 
     let items: rusoto_dynamodb::QueryOutput =
@@ -106,7 +91,7 @@ fn test_query_index_model(db: impl Database) -> Result<(), Box<dyn Error>> {
 }
 
 #[apply(database)]
-fn test_query_index_submodel(db: impl Database) -> Result<(), Box<dyn Error>> {
+fn test_query_index_submodel(db: impl Database) -> TestResult {
     insert_models(&db)?;
 
     let items: rusoto_dynamodb::QueryOutput =
@@ -127,7 +112,7 @@ fn test_query_index_submodel(db: impl Database) -> Result<(), Box<dyn Error>> {
 }
 
 #[apply(database)]
-fn test_scan(db: impl Database) -> Result<(), Box<dyn Error>> {
+fn test_scan(db: impl Database) -> TestResult {
     insert_models(&db)?;
 
     let items: rusoto_dynamodb::ScanOutput = smol::run(db.scan(None::<String>, None))?;
@@ -139,7 +124,7 @@ fn test_scan(db: impl Database) -> Result<(), Box<dyn Error>> {
 }
 
 #[apply(database)]
-fn test_scan_index(db: impl Database) -> Result<(), Box<dyn Error>> {
+fn test_scan_index(db: impl Database) -> TestResult {
     insert_models(&db)?;
 
     let items: rusoto_dynamodb::ScanOutput = smol::run(db.scan(Some("model"), None))?;
@@ -151,7 +136,7 @@ fn test_scan_index(db: impl Database) -> Result<(), Box<dyn Error>> {
 }
 
 #[apply(database)]
-fn test_scan_limit(db: impl Database) -> Result<(), Box<dyn Error>> {
+fn test_scan_limit(db: impl Database) -> TestResult {
     insert_models(&db)?;
 
     let items: rusoto_dynamodb::ScanOutput = smol::run(db.scan(None::<String>, Some(1)))?;
@@ -163,7 +148,7 @@ fn test_scan_limit(db: impl Database) -> Result<(), Box<dyn Error>> {
 }
 
 #[apply(database)]
-fn test_transact_write_items(db: impl Database) -> Result<(), Box<dyn Error>> {
+fn test_transact_write_items(db: impl Database) -> TestResult {
     let table_name = smol::run(db.describe_table())?;
     assert!(table_name.table.is_some());
 

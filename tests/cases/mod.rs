@@ -1,15 +1,20 @@
 use async_std::task::sleep;
 use async_trait::async_trait;
 use futures_intrusive::sync::Semaphore;
-use rusoto_dynamodb::DynamoDbClient;
 use smol_timeout::TimeoutExt;
-use std::time::Duration;
+use std::{error::Error, time::Duration};
 
 use single_table::*;
 use traits::{Database, Key};
 
 mod database;
 
+type TestResult = Result<(), Box<dyn Error>>;
+
+#[cfg(feature = "external_database")]
+pub use rusoto_dynamodb::DynamoDbClient;
+
+#[cfg(feature = "external_database")]
 fn dynamodb() -> TemporaryDatabase<ddb::DDB> {
     // Connect to dynamodb-local
     // There's a script in `/scripts/start-ddb.sh` to set one up with docker
@@ -28,6 +33,14 @@ fn dynamodb() -> TemporaryDatabase<ddb::DDB> {
     }
 }
 
+fn memorydb() -> TemporaryDatabase<mem::MemoryDB> {
+    let memdb = mem::memorydb();
+    let db = TemporaryDatabase::new(memdb);
+
+    db.sync_create_table();
+    db
+}
+
 struct TemporaryDatabase<DB: Database + Send + Sync>(DB, Semaphore);
 
 impl<DB: Database + Send + Sync> TemporaryDatabase<DB> {
@@ -38,17 +51,22 @@ impl<DB: Database + Send + Sync> TemporaryDatabase<DB> {
     }
 
     fn sync_create_table(&self) {
-        if let None = smol::run(async { self.create_table().timeout(Duration::from_secs(2)).await })
-        {
-            panic!("sync_create_table: timed out");
+        if let None = smol::run(self.create_table().timeout(Duration::from_secs(2))) {
+            panic!(
+                r#"
+sync_create_table: timed out
+Do you need to start the database?
+
+    $ ./scripts/start-ddb.sh
+    $ export AWS_ENDPOINT_URL=http://localhost:2000
+
+"#
+            );
         };
     }
 
     fn sync_delete_table(&self) {
-        if let None = smol::run(async { self.delete_table().timeout(Duration::from_secs(1)).await })
-        {
-            panic!("sync_delete_table: timed out");
-        };
+        let _ = smol::run(self.delete_table().timeout(Duration::from_secs(1)));
     }
 }
 
@@ -138,4 +156,22 @@ impl<DB: Database + Send + Sync> Database for TemporaryDatabase<DB> {
         let _sem = self.1.acquire(1).await;
         self.0.transact_write_items(transact_items).await
     }
+}
+
+fn insert_models(db: &impl Database) -> TestResult {
+    let foo: Model = Model::new("foo", 1);
+    let bar: SubModel = SubModel::new("bar", foo.clone());
+    let baz: SubModel = SubModel::new("baz", foo.clone());
+
+    let items: Vec<types::HashMap> = vec![
+        serde_dynamodb::to_hashmap(&foo)?,
+        serde_dynamodb::to_hashmap(&bar)?,
+        serde_dynamodb::to_hashmap(&baz)?,
+    ];
+
+    smol::run(futures::future::join_all(
+        items.iter().map(|item| db.put_item(item.clone())),
+    ));
+
+    Ok(())
 }
