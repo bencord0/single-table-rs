@@ -1,4 +1,5 @@
 use rstest::rstest;
+use rstest_reuse::*;
 use std::error::Error;
 
 use single_table::*;
@@ -24,7 +25,11 @@ fn insert_models(db: &impl Database) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[template]
 #[rstest(db, case::ddb(dynamodb()), case::mem(mem::memorydb()))]
+fn database(db: impl Database) {}
+
+#[apply(database)]
 fn test_get_none(db: impl Database) -> Result<(), Box<dyn Error>> {
     let get_item_output = smol::run(db.get_item("model#foo", "model#foo"))?;
 
@@ -34,7 +39,7 @@ fn test_get_none(db: impl Database) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[rstest(db, case::ddb(dynamodb()), case::mem(mem::memorydb()))]
+#[apply(database)]
 fn test_put_get_some(db: impl Database) -> Result<(), Box<dyn Error>> {
     let model = Model::new("foo", 1);
 
@@ -57,7 +62,7 @@ fn test_put_get_some(db: impl Database) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[rstest(db, case::ddb(dynamodb()), case::mem(mem::memorydb()))]
+#[apply(database)]
 fn test_query_submodels(db: impl Database) -> Result<(), Box<dyn Error>> {
     insert_models(&db)?;
 
@@ -79,7 +84,7 @@ fn test_query_submodels(db: impl Database) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[rstest(db, case::ddb(dynamodb()), case::mem(mem::memorydb()))]
+#[apply(database)]
 fn test_query_index_model(db: impl Database) -> Result<(), Box<dyn Error>> {
     insert_models(&db)?;
 
@@ -100,7 +105,7 @@ fn test_query_index_model(db: impl Database) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[rstest(db, case::ddb(dynamodb()), case::mem(mem::memorydb()))]
+#[apply(database)]
 fn test_query_index_submodel(db: impl Database) -> Result<(), Box<dyn Error>> {
     insert_models(&db)?;
 
@@ -121,7 +126,7 @@ fn test_query_index_submodel(db: impl Database) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[rstest(db, case::ddb(dynamodb()), case::mem(mem::memorydb()))]
+#[apply(database)]
 fn test_scan(db: impl Database) -> Result<(), Box<dyn Error>> {
     insert_models(&db)?;
 
@@ -133,7 +138,7 @@ fn test_scan(db: impl Database) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[rstest(db, case::ddb(dynamodb()), case::mem(mem::memorydb()))]
+#[apply(database)]
 fn test_scan_index(db: impl Database) -> Result<(), Box<dyn Error>> {
     insert_models(&db)?;
 
@@ -145,7 +150,7 @@ fn test_scan_index(db: impl Database) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[rstest(db, case::ddb(dynamodb()), case::mem(mem::memorydb()))]
+#[apply(database)]
 fn test_scan_limit(db: impl Database) -> Result<(), Box<dyn Error>> {
     insert_models(&db)?;
 
@@ -157,7 +162,7 @@ fn test_scan_limit(db: impl Database) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[rstest(db, case::ddb(dynamodb()), case::mem(mem::memorydb()))]
+#[apply(database)]
 fn test_transact_write_items(db: impl Database) -> Result<(), Box<dyn Error>> {
     let table_name = smol::run(db.describe_table())?;
     assert!(table_name.table.is_some());
