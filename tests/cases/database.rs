@@ -2,21 +2,48 @@ use rstest::rstest;
 use rstest_reuse::*;
 
 use single_table::*;
-use traits::Database;
+use traits::{Database, TransactionalOperations};
 
 use super::*;
 
-#[template]
-#[rstest(db,
-    #[cfg(feature = "external_database")]
-    case::ddb(dynamodb()),
-    case::mem(memorydb()),
-)]
-fn database(db: impl Database) {}
+struct State<DB>
+where
+    DB: Database + Send + Sync,
+{
+    db: TemporaryDatabase<DB>,
+}
 
-#[apply(database)]
-fn test_get_none(db: impl Database) -> TestResult {
-    let get_item_output = smol::run(db.get_item("model#foo", "model#foo"))?;
+#[cfg(feature = "external_database")]
+impl State<ddb::DDB> {
+    fn new() -> Self {
+        Self { db: dynamodb() }
+    }
+}
+
+impl State<mem::MemoryDB> {
+    fn new() -> Self {
+        Self { db: memorydb() }
+    }
+}
+
+#[template]
+#[rstest(state,
+    #[cfg(feature = "external_database")]
+    case::ddb(State::<ddb::DDB>::new()),
+    case::mem(State::<mem::MemoryDB>::new()),
+)]
+fn state<DB>(state: State<DB>)
+where
+    DB: Database + Send + Sync,
+{
+}
+
+#[apply(state)]
+fn test_get_none<DB>(state: State<DB>) -> TestResult
+where
+    DB: Database + Send + Sync,
+{
+    let get_item_output = smol::run(state.db.get_item("model#foo", "model#foo"))?;
 
     let item = get_item_output.item;
     assert_eq!(item, None);
@@ -24,17 +51,20 @@ fn test_get_none(db: impl Database) -> TestResult {
     Ok(())
 }
 
-#[apply(database)]
-fn test_put_get_some(db: impl Database) -> TestResult {
+#[apply(state)]
+fn test_put_get_some<DB>(state: State<DB>) -> TestResult
+where
+    DB: Database + Send + Sync,
+{
     let model = Model::new("foo", 1);
 
     let hashmap: types::HashMap =
         serde_dynamodb::to_hashmap(&model).unwrap_or_else(|_| types::HashMap::new());
 
-    let put_item_output = smol::run(db.put_item(hashmap))?;
+    let put_item_output = smol::run(state.db.put_item(hashmap))?;
     println!("{:?}", put_item_output);
 
-    let get_item_output = smol::run(db.get_item("model#foo", "model#foo"))?;
+    let get_item_output = smol::run(state.db.get_item("model#foo", "model#foo"))?;
     let item = get_item_output
         .item
         .unwrap_or_else(|| types::HashMap::new());
@@ -47,12 +77,15 @@ fn test_put_get_some(db: impl Database) -> TestResult {
     Ok(())
 }
 
-#[apply(database)]
-fn test_query_submodels(db: impl Database) -> TestResult {
-    insert_models(&db)?;
+#[apply(state)]
+fn test_query_submodels<DB>(state: State<DB>) -> TestResult
+where
+    DB: Database + Send + Sync,
+{
+    insert_models(&state.db)?;
 
     let items: rusoto_dynamodb::QueryOutput =
-        smol::run(db.query(None, "model#foo", "model#foo#submodel#"))?;
+        smol::run(state.db.query(None, "model#foo", "model#foo#submodel#"))?;
     assert_eq!(items.count, Some(2));
 
     let mut submodels: Vec<SubModel> = vec![];
@@ -69,12 +102,15 @@ fn test_query_submodels(db: impl Database) -> TestResult {
     Ok(())
 }
 
-#[apply(database)]
-fn test_query_index_model(db: impl Database) -> TestResult {
-    insert_models(&db)?;
+#[apply(state)]
+fn test_query_index_model<DB>(state: State<DB>) -> TestResult
+where
+    DB: Database + Send + Sync,
+{
+    insert_models(&state.db)?;
 
     let items: rusoto_dynamodb::QueryOutput =
-        smol::run(db.query(Some("model"), "model", "model#foo"))?;
+        smol::run(state.db.query(Some("model"), "model", "model#foo"))?;
     assert_eq!(items.count, Some(1));
 
     let mut models: Vec<Model> = vec![];
@@ -90,12 +126,18 @@ fn test_query_index_model(db: impl Database) -> TestResult {
     Ok(())
 }
 
-#[apply(database)]
-fn test_query_index_submodel(db: impl Database) -> TestResult {
-    insert_models(&db)?;
+#[apply(state)]
+fn test_query_index_submodel<DB>(state: State<DB>) -> TestResult
+where
+    DB: Database + Send + Sync,
+{
+    insert_models(&state.db)?;
 
-    let items: rusoto_dynamodb::QueryOutput =
-        smol::run(db.query(Some("model"), "submodel", "model#foo#submodel#bar"))?;
+    let items: rusoto_dynamodb::QueryOutput = smol::run(state.db.query(
+        Some("model"),
+        "submodel",
+        "model#foo#submodel#bar",
+    ))?;
     assert_eq!(items.count, Some(1));
 
     let mut submodels: Vec<SubModel> = vec![];
@@ -111,11 +153,14 @@ fn test_query_index_submodel(db: impl Database) -> TestResult {
     Ok(())
 }
 
-#[apply(database)]
-fn test_scan(db: impl Database) -> TestResult {
-    insert_models(&db)?;
+#[apply(state)]
+fn test_scan<DB>(state: State<DB>) -> TestResult
+where
+    DB: Database + Send + Sync,
+{
+    insert_models(&state.db)?;
 
-    let items: rusoto_dynamodb::ScanOutput = smol::run(db.scan(None::<String>, None))?;
+    let items: rusoto_dynamodb::ScanOutput = smol::run(state.db.scan(None::<String>, None))?;
     assert_eq!(items.count, Some(3));
     assert_eq!(items.scanned_count, Some(3));
 
@@ -123,11 +168,14 @@ fn test_scan(db: impl Database) -> TestResult {
     Ok(())
 }
 
-#[apply(database)]
-fn test_scan_index(db: impl Database) -> TestResult {
-    insert_models(&db)?;
+#[apply(state)]
+fn test_scan_index<DB>(state: State<DB>) -> TestResult
+where
+    DB: Database + Send + Sync,
+{
+    insert_models(&state.db)?;
 
-    let items: rusoto_dynamodb::ScanOutput = smol::run(db.scan(Some("model"), None))?;
+    let items: rusoto_dynamodb::ScanOutput = smol::run(state.db.scan(Some("model"), None))?;
     assert_eq!(items.count, Some(3));
     assert_eq!(items.scanned_count, Some(3));
 
@@ -135,11 +183,14 @@ fn test_scan_index(db: impl Database) -> TestResult {
     Ok(())
 }
 
-#[apply(database)]
-fn test_scan_limit(db: impl Database) -> TestResult {
-    insert_models(&db)?;
+#[apply(state)]
+fn test_scan_limit<DB>(state: State<DB>) -> TestResult
+where
+    DB: Database + Send + Sync,
+{
+    insert_models(&state.db)?;
 
-    let items: rusoto_dynamodb::ScanOutput = smol::run(db.scan(None::<String>, Some(1)))?;
+    let items: rusoto_dynamodb::ScanOutput = smol::run(state.db.scan(None::<String>, Some(1)))?;
     assert_eq!(items.count, Some(1));
     assert_eq!(items.scanned_count, Some(1));
 
@@ -147,21 +198,24 @@ fn test_scan_limit(db: impl Database) -> TestResult {
     Ok(())
 }
 
-#[apply(database)]
-fn test_transact_write_items(db: impl Database) -> TestResult {
-    let table_name = smol::run(db.describe_table())?;
+#[apply(state)]
+fn test_transact_write_items<DB>(state: State<DB>) -> TestResult
+where
+    DB: Database + Send + Sync,
+{
+    let table_name = smol::run(state.db.describe_table())?;
     assert!(table_name.table.is_some());
 
     let mut foo: Model = Model::new("foo", 1);
     let bar: SubModel = SubModel::new("bar", foo.clone());
 
-    let _ = smol::run(foo.save(&db))?;
-    let _ = smol::run(db.transact_write_items(vec![
-        db.condition_check_exists(foo.pk(), foo.sk(), foo.model()),
-        db.put(bar.to_hashmap()?),
+    let _ = smol::run(foo.save(&state.db))?;
+    let _ = smol::run(state.db.transact_write_items(vec![
+        state.db.condition_check_exists(foo.pk(), foo.sk(), foo.model()),
+        state.db.put(bar.to_hashmap()?),
     ]))?;
 
-    let res = smol::run(SubModel::get(&db, "foo", "bar"))?;
+    let res = smol::run(SubModel::get(&state.db, "foo", "bar"))?;
     println!("{:?}", res);
     assert_eq!(res.name(), "bar");
 
