@@ -1,6 +1,6 @@
-use async_std::task::sleep;
 use async_trait::async_trait;
-use futures_intrusive::sync::Semaphore;
+use futures_intrusive::sync::{Semaphore, SemaphoreReleaser};
+use once_cell::sync::Lazy;
 use smol_timeout::TimeoutExt;
 use std::{error::Error, time::Duration};
 
@@ -41,13 +41,25 @@ fn memorydb() -> TemporaryDatabase<mem::MemoryDB> {
     db
 }
 
-struct TemporaryDatabase<DB: Database + Send + Sync>(DB, Semaphore);
+struct TemporaryDatabase<DB: Database + Send + Sync>(DB);
+
+const SEMSIZE: usize = 20;
+static SEMAPHORE: Lazy<Semaphore> = Lazy::new(|| {
+    // Create an async aware semaphore to allow some parallel access to the db
+    Semaphore::new(true, SEMSIZE)
+});
 
 impl<DB: Database + Send + Sync> TemporaryDatabase<DB> {
     fn new(db: DB) -> Self {
-        // Create an async aware semaphore to allow some parallel access to the db
-        let semaphore = Semaphore::new(true, 5);
-        Self(db, semaphore)
+        Self(db)
+    }
+
+    async fn acquire(&self) -> SemaphoreReleaser<'_> {
+        SEMAPHORE.acquire(1 as usize).await
+    }
+
+    async fn acquire_all(&self) -> SemaphoreReleaser<'_> {
+        SEMAPHORE.acquire(SEMSIZE).await
     }
 
     fn sync_create_table(&self) {
@@ -90,30 +102,28 @@ impl<DB: Database + Send + Sync> Database for TemporaryDatabase<DB> {
         // to protect the db when creating tables.
         match {
             // lightweight acquire, drop at end of block
-            let _sem = self.1.acquire(1).await;
+            let _sem = self.acquire().await;
             self.0.create_table().await
         } {
             // Successfully created the table on first try
             Ok(table_result) => Ok(table_result),
 
             // Failed to create the table.
-            // Acquire the full semaphore and wait for the db to settle
+            // Acquire the full semaphore to wait for the db to settle
             Err(_) => {
-                let _sem = self.1.acquire(5).await;
-                sleep(Duration::from_millis(500)).await;
-
+                let _sem = self.acquire_all().await;
                 Ok(self.0.create_table().await.expect("create_table"))
             }
         }
     }
 
     async fn delete_table(&self) -> types::DeleteTableResult {
-        let _sem = self.1.acquire(1).await;
+        let _sem = self.acquire().await;
         self.0.delete_table().await
     }
 
     async fn describe_table(&self) -> types::DescribeTableResult {
-        let _sem = self.1.acquire(1).await;
+        let _sem = self.acquire().await;
         self.0.describe_table().await
     }
 
@@ -122,12 +132,12 @@ impl<DB: Database + Send + Sync> Database for TemporaryDatabase<DB> {
         index: Option<S>,
         limit: Option<i64>,
     ) -> types::ScanResult {
-        let _sem = self.1.acquire(1).await;
+        let _sem = self.acquire().await;
         self.0.scan(index, limit).await
     }
 
     async fn get_item<S: Into<String> + Send>(&self, pk: S, sk: S) -> types::GetItemResult {
-        let _sem = self.1.acquire(1).await;
+        let _sem = self.acquire().await;
         self.0.get_item(pk, sk).await
     }
 
@@ -135,7 +145,7 @@ impl<DB: Database + Send + Sync> Database for TemporaryDatabase<DB> {
         &self,
         hashmap: H,
     ) -> types::PutItemResult {
-        let _sem = self.1.acquire(1).await;
+        let _sem = self.acquire().await;
         self.0.put_item(hashmap).await
     }
 
@@ -145,7 +155,7 @@ impl<DB: Database + Send + Sync> Database for TemporaryDatabase<DB> {
         pk: S,
         sk: S,
     ) -> types::QueryResult {
-        let _sem = self.1.acquire(1).await;
+        let _sem = self.acquire().await;
         self.0.query(index, pk, sk).await
     }
 
@@ -153,7 +163,7 @@ impl<DB: Database + Send + Sync> Database for TemporaryDatabase<DB> {
         &self,
         transact_items: Vec<types::TransactWriteItem>,
     ) -> types::TransactWriteItemsResult {
-        let _sem = self.1.acquire(1).await;
+        let _sem = self.acquire().await;
         self.0.transact_write_items(transact_items).await
     }
 }

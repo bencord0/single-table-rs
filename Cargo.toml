@@ -4,11 +4,15 @@ version = "0.1.0"
 authors = ["Ben Cordero <bencord0@condi.me>"]
 edition = "2018"
 
+[lib]
+doctest = false
+
 [dependencies]
 async-mutex = "1.1.3"
 async-trait = "0.1.35"
 chrono = "0.4.11"
 clap = "3.0.0-beta.1"
+once_cell = "1.4.0"
 rusoto_core = "0.44.0"
 rusoto_dynamodb = "0.44.0"
 rusoto_sts = "0.44.0"
@@ -22,7 +26,6 @@ uuid = { version = "0.8.1", features = ["v4"] }
 serde_dynamodb = { git = "https://github.com/mockersf/serde_dynamodb", rev = "c352024c0ae25f32f03494585449aa3c4a0b27b4" }
 
 [dev-dependencies]
-async-std = "1.6.2"
 futures = "0.3.5"
 futures-intrusive = "0.3.1"
 rstest = "0.6.4"
